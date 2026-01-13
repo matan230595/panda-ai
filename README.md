@@ -1,11 +1,32 @@
-<div align="center">
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+# 🐼 PandaAi Elite - מדריך "חבילת המראה"
 
-  <h1>Built with AI Studio</h2>
+כדי להוציא את האפליקציה מהסביבה הזו ולהפוך אותה לאתר אמיתי, פעל לפי השלבים הבאים:
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## 1. איפה כפתור ההורדה? 📥
+בסרגל הצד של הממשק בו אתה נמצא (איפה שרשימת הקבצים):
+* חפש אייקון של **ענן עם חץ** או **תיקייה עם חץ למטה**.
+* לחץ על **"Download Project"** או **"Export to ZIP"**.
+* שמור את הקובץ במחשב וחלץ את התיקייה.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## 2. הפעלה מקומית במחשב (אופציונלי)
+אם מותקן אצלך Node.js:
+1. פתח טרמינל בתיקייה.
+2. הרץ `npm install`.
+3. הרץ `npm run dev`.
 
-</div>
+## 3. פריסה לעולם (Vercel) 🚀
+1. העלה את התיקייה ל-GitHub.
+2. חבר את ה-Repo ל-Vercel.
+3. **חשוב:** הגדר ב-Vercel תחת "Environment Variables" את המפתח:
+   `API_KEY` = [המפתח שלך מ-Google AI Studio].
+
+## 4. איך מעדכנים בעתיד? 🔄
+אם ביקשת ממני שינוי בקוד ואהבת אותו:
+1. פתח את הקובץ ששיניתי כאן (למשל `App.tsx`).
+2. העתק את כל הקוד שלו.
+3. הדבק אותו בקובץ `App.tsx` ב-GitHub שלך ושמור (Commit).
+4. ה-Vercel יתעדכן מעצמו תוך כמה שניות!
+
+---
+*נבנה עבור PandaAi Elite - גרסה 1.1.0*

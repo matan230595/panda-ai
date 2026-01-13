@@ -1,0 +1,9 @@
+{
+  "name": "PandaAi ",
+  "description": "סביבת עבודה חכמה ויוקרתית מבוססת בינה מלאכותית לבניית אפליקציות, כתיבת קוד וניהול תקשורת אסטרטגית.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera",
+    "geolocation"
+  ]
+}
