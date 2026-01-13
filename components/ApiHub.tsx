@@ -16,8 +16,8 @@ const ApiHub: React.FC<ApiHubProps> = ({ apis, onAdd, onRemove, appSettings }) =
     name: '', baseUrl: '', apiKey: '', authHeader: 'Authorization', description: '', provider: 'google', status: 'testing'
   });
 
-  const t = translations[appSettings.language] || translations.he;
-  const isRTL = appSettings.language === 'he';
+  const t = translations.he; // Force Hebrew
+  const isRTL = true;
 
   const providers = [
     { 
@@ -43,7 +43,7 @@ const ApiHub: React.FC<ApiHubProps> = ({ apis, onAdd, onRemove, appSettings }) =
     },
     { 
       id: 'groq', 
-      name: 'Groq (Ultra-Fast)', 
+      name: 'Groq (מהיר במיוחד)', 
       icon: '⚡', 
       guide: t.groqDesc,
       link: 'https://console.groq.com/keys'
@@ -71,11 +71,11 @@ const ApiHub: React.FC<ApiHubProps> = ({ apis, onAdd, onRemove, appSettings }) =
   };
 
   return (
-    <div className={`flex-1 overflow-y-auto p-4 md:p-12 lg:p-16 view-transition scrollbar-hide bg-[#050508] ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+    <div className={`flex-1 overflow-y-auto p-4 md:p-12 lg:p-16 view-transition scrollbar-hide bg-[#050508] text-right`} dir="rtl">
       <div className="max-w-6xl mx-auto space-y-12 pb-24">
         
         <div className="flex flex-col md:flex-row justify-between items-center gap-8 border-b border-white/10 pb-10">
-           <div className={`w-full md:w-auto ${isRTL ? 'text-right' : 'text-left'}`}>
+           <div className={`w-full md:w-auto text-right`}>
               <h2 className="text-4xl md:text-6xl font-black text-white italic tracking-tighter uppercase leading-none glow-text">{t.apiHubTitle}</h2>
               <p className="text-zinc-500 text-[10px] font-black tracking-[0.4em] uppercase mt-4">{t.apiHubSubtitle}</p>
            </div>
@@ -116,7 +116,7 @@ const ApiHub: React.FC<ApiHubProps> = ({ apis, onAdd, onRemove, appSettings }) =
               ) : (
                 apis.map(api => (
                   <div key={api.id} className="glass p-8 rounded-[2.5rem] border border-white/5 hover:border-indigo-500/30 transition-all bg-white/[0.01] relative group overflow-hidden">
-                     <button onClick={() => onRemove(api.id)} className={`absolute top-6 text-zinc-700 hover:text-red-500 transition-colors ${isRTL ? 'left-6' : 'right-6'}`}>✕</button>
+                     <button onClick={() => onRemove(api.id)} className="absolute top-6 left-6 text-zinc-700 hover:text-red-500 transition-colors">✕</button>
                      <div className="text-4xl mb-6">{providers.find(p => p.id === api.provider)?.icon || '⚡'}</div>
                      <div className="space-y-1">
                         <h4 className="text-xl font-black text-white truncate">{api.name}</h4>
@@ -138,7 +138,7 @@ const ApiHub: React.FC<ApiHubProps> = ({ apis, onAdd, onRemove, appSettings }) =
 
       {isAdding && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-2xl animate-in fade-in duration-300">
-           <div className="max-w-xl w-full glass p-10 rounded-[4rem] border border-indigo-500/30 space-y-8 bg-[#0a0a14] animate-in zoom-in-95 shadow-3xl">
+           <div className="max-w-xl w-full bg-[#0a0a14] p-10 rounded-[4rem] border border-indigo-500/30 space-y-8 animate-in zoom-in-95 shadow-[0_0_100px_rgba(79,70,229,0.2)]">
               <div className="flex justify-between items-center">
                  <h3 className="text-2xl font-black text-white italic tracking-tighter uppercase">{t.newConnectionTitle}</h3>
                  <button onClick={() => setIsAdding(false)} className="text-zinc-500 hover:text-white transition-all text-2xl">✕</button>
@@ -167,7 +167,7 @@ const ApiHub: React.FC<ApiHubProps> = ({ apis, onAdd, onRemove, appSettings }) =
                        <input 
                          value={newApi.name} onChange={e => setNewApi({...newApi, name: e.target.value})}
                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-indigo-500/50 text-sm font-bold"
-                         placeholder="e.g. My Production Key"
+                         placeholder="למשל: המפתח הראשי שלי"
                        />
                     </div>
                     <div className="space-y-2">

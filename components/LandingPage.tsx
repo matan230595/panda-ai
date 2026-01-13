@@ -1,95 +1,80 @@
 
 import React from 'react';
 import Logo from './Logo';
-import { UserRole, AppSettings } from '../types';
+import { AppSettings, ViewMode } from '../types';
 import { translations } from '../utils/translations';
 
-interface LandingPageProps {
-  onStart: (role: UserRole) => void;
-  customLogo?: string;
-  appSettings: AppSettings;
-  onLanguageChange: (lang: 'he' | 'en' | 'es') => void;
-}
+const LandingPage: React.FC<{ onStart: () => void; appSettings: AppSettings; setView: (v: ViewMode) => void; onOpenLegal: (t: any) => void; }> = ({ onStart, appSettings, setView, onOpenLegal }) => {
+  const t = translations.he;
+  const content = appSettings.dynamicContent;
 
-const LandingPage: React.FC<LandingPageProps> = ({ onStart, customLogo, appSettings, onLanguageChange }) => {
-  const t = translations[appSettings.language] || translations.he;
-  const isRTL = appSettings.language === 'he';
+  const features = [
+    { title: t.titleStrategy, icon: "💬", mode: ViewMode.CHAT, desc: t.toolDescStrategy },
+    { title: t.titleDocs, icon: "📄", mode: ViewMode.DOC_ANALYSIS, desc: t.toolDescDocs },
+    { title: t.titleArt, icon: "🎨", mode: ViewMode.IMAGE_GEN, desc: t.toolDescArt },
+    { title: t.titleVoice, icon: "🎙️", mode: ViewMode.VOICE, desc: t.toolDescVoice },
+    { title: t.titleVideo, icon: "🎬", mode: ViewMode.VIDEO_GEN, desc: t.toolDescVideo },
+    { title: t.titlePrompt, icon: "🧠", mode: ViewMode.PROMPT_LAB, desc: t.toolDescPrompt },
+    { title: t.titleMessage, icon: "📩", mode: ViewMode.MESSAGE_GEN, desc: t.toolDescMessage },
+    { title: t.titleProjects, icon: "📁", mode: ViewMode.PROJECT_DASHBOARD, desc: t.toolDescProjects }
+  ];
 
   return (
-    <div className={`flex-1 overflow-y-auto scrollbar-hide bg-[#020205] ${isRTL ? 'text-right' : 'text-left'} font-['Heebo']`} dir={isRTL ? 'rtl' : 'ltr'}>
-      {/* Hero Section */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center px-6 py-20 overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-600/5 blur-[120px] rounded-full pointer-events-none animate-pulse"></div>
+    <div className="flex-1 overflow-y-auto bg-[#020205] text-right" dir="rtl">
+      <header className="fixed top-0 left-0 right-0 h-24 px-8 flex items-center justify-between z-50 backdrop-blur-xl border-b border-white/5 bg-[#020205]/80">
+        <Logo size="sm" customLogo={appSettings.customLogoUrl} />
+        <button onClick={onStart} className="px-8 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-black text-sm shadow-lg transition-all active:scale-95 uppercase tracking-wide">{t.submit}</button>
+      </header>
 
-        {/* Language Switcher */}
-        <div className="absolute top-6 right-6 z-50 flex gap-2">
-           {['he', 'en', 'es'].map((lang) => (
-             <button 
-               key={lang}
-               onClick={() => onLanguageChange(lang as any)}
-               className={`px-3 py-1 rounded-lg text-xs font-bold uppercase ${appSettings.language === lang ? 'bg-indigo-600 text-white' : 'bg-white/5 text-zinc-500 hover:text-white'}`}
-             >
-               {lang}
+      <section className="min-h-screen flex flex-col items-center justify-center px-6 pt-32 pb-20 relative overflow-hidden">
+        {/* Background Gradients */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-orange-600/10 blur-[120px] rounded-full"></div>
+        
+        <div className="max-w-6xl w-full text-center space-y-12 relative z-10">
+          <div className="space-y-8 flex flex-col items-center">
+            <div onClick={onStart} className="w-32 h-32 bg-white/5 rounded-[2.5rem] flex items-center justify-center text-6xl shadow-2xl border border-white/10 cursor-pointer animate-bounce hover:scale-110 transition-transform duration-500">🐼</div>
+            
+            <h1 className="text-6xl md:text-[8rem] font-black italic tracking-tighter uppercase leading-[0.9]">
+              <span className="text-white">PANDA </span>
+              <span className="text-orange-600 italic">AI</span>
+            </h1>
+            
+            <h2 className="text-zinc-300 text-2xl md:text-4xl font-bold italic tracking-wide">{t.welcome}</h2>
+            
+            <p className="text-zinc-500 text-lg md:text-xl max-w-3xl border-r-4 border-orange-600 pr-6 leading-relaxed">
+              {content.landingDesc}
+            </p>
+          </div>
+          
+          <button onClick={onStart} className="px-16 py-6 bg-orange-600 hover:bg-orange-500 text-white font-black text-2xl rounded-2xl shadow-xl transition-all hover:scale-105 active:scale-95 italic uppercase tracking-widest ring-4 ring-orange-600/20">
+            התחל עכשיו בחינם ⚡
+          </button>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-6 py-24 space-y-16">
+        <h2 className="text-4xl font-black text-white italic text-center uppercase tracking-tighter">סט הכלים המלא 🐼</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+           {features.map((f, i) => (
+             <button key={i} onClick={() => { onStart(); setView(f.mode); }} className="glass p-8 rounded-[3rem] border border-white/10 bg-white/[0.01] hover:bg-white/[0.03] text-right group hover:border-orange-500/30 transition-all duration-300">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-inner">{f.icon}</div>
+                  <h4 className="text-lg font-black text-white uppercase italic group-hover:text-orange-500 transition-colors">{f.title}</h4>
+                </div>
+                <p className="text-zinc-500 text-xs italic font-medium leading-relaxed">{f.desc}</p>
              </button>
            ))}
         </div>
-
-        <div className="relative z-10 max-w-6xl w-full text-center space-y-12 animate-in fade-in duration-1000">
-          <div className="flex justify-center mb-12">
-            <div className="p-4 rounded-[2.5rem] bg-white/[0.02] border border-white/5 backdrop-blur-md shadow-2xl">
-               <Logo size="md" customLogo={customLogo} showText={false} />
-            </div>
-          </div>
-
-          <div className="space-y-8">
-            <h1 className="text-6xl md:text-[8rem] font-black leading-[0.9] italic tracking-tighter uppercase hero-title glow-text">
-              <span className="block" dir="ltr">PANDA <span className="text-indigo-500">AI</span></span>
-              <span className="block mt-4 text-3xl md:text-5xl font-light normal-case tracking-normal text-zinc-400 opacity-80">{t.landingSubtitleSimple}</span>
-            </h1>
-
-            <p className="text-xl md:text-3xl text-zinc-500 font-medium max-w-3xl mx-auto leading-relaxed italic">
-              {t.landingDescSimple}
-            </p>
-          </div>
-
-          <div className="pt-12">
-            <button 
-              onClick={() => onStart(UserRole.BEGINNER)} 
-              className="px-16 md:px-24 py-6 md:py-8 bg-white text-black font-black text-xl md:text-2xl rounded-full shadow-2xl transition-all hover:scale-105 active:scale-95 uppercase italic tracking-widest"
-            >
-              {t.landingCtaSimple} 🚀
-            </button>
-          </div>
-        </div>
       </section>
 
-      {/* Bento Grid Showcase */}
-      <section className="max-w-7xl mx-auto px-6 py-40">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 glass p-12 rounded-[4rem] border border-white/5 bg-gradient-to-br from-indigo-500/[0.03] to-transparent h-[400px] flex flex-col justify-end">
-            <h3 className="text-4xl font-black text-white italic uppercase tracking-tighter mb-4">{t.intelUnleashed}</h3>
-            <p className="text-zinc-500 text-lg font-medium leading-relaxed italic">{t.intelDesc}</p>
-          </div>
-          <div className="glass p-12 rounded-[4rem] border border-white/5 bg-white/[0.01] h-[400px] flex flex-col items-center justify-center text-center">
-            <span className="text-7xl mb-6">🎙️</span>
-            <h4 className="text-2xl font-black text-white uppercase italic">{t.voice}</h4>
-            <p className="text-zinc-600 text-sm mt-2">{t.voiceActive}</p>
-          </div>
-          <div className="glass p-12 rounded-[4rem] border border-white/5 bg-white/[0.01] h-[400px] flex flex-col items-center justify-center text-center">
-            <span className="text-7xl mb-6">🎨</span>
-            <h4 className="text-2xl font-black text-white uppercase italic">{t.imageGen}</h4>
-            <p className="text-zinc-600 text-sm mt-2">{t.imageSubtitle}</p>
-          </div>
-          <div className="lg:col-span-2 glass p-12 rounded-[4rem] border border-white/5 bg-gradient-to-bl from-amber-500/[0.02] to-transparent h-[400px] flex flex-col justify-end">
-            <h3 className="text-4xl font-black text-white italic uppercase tracking-tighter mb-4">{t.messageGen}</h3>
-            <p className="text-zinc-500 text-lg font-medium leading-relaxed italic">{t.stratMsgSubtitle}</p>
-          </div>
+      <footer className="py-20 border-t border-white/5 flex flex-col items-center gap-10 bg-black/40 backdrop-blur-xl">
+        <div className="flex gap-12 text-xs font-black uppercase text-zinc-500 tracking-widest">
+           <button onClick={() => onOpenLegal('terms')} className="hover:text-white transition-all">{t.terms}</button>
+           <button onClick={() => onOpenLegal('privacy')} className="hover:text-white transition-all">{t.privacy}</button>
+           <button onClick={() => onOpenLegal('accessibility')} className="hover:text-white transition-all">{t.accessibility}</button>
+           <button onClick={() => onOpenLegal('contact')} className="text-orange-600 hover:text-orange-400 border-b border-orange-600/30 pb-0.5">{t.contact}</button>
         </div>
-      </section>
-
-      <footer className="py-20 text-center opacity-30">
-        <Logo size="sm" showText={false} />
-        <p className="text-[10px] font-black uppercase tracking-[1em] mt-8">© 2025 PANDAAI ELITE STUDIO</p>
+        <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest">{t.copyright}</p>
       </footer>
     </div>
   );

@@ -1,17 +1,22 @@
 
-
 export enum AIModelMode {
   STANDARD = 'FAST',
   THINKING = 'REASONING',
   RESEARCH = 'RESEARCH',
   VISION = 'VISION',
-  AGENTIC = 'AGENTIC' // New mode for autonomous task execution
+  AGENTIC = 'AGENTIC'
 }
 
 export enum UserRole {
   BEGINNER = 'USER',
   DEVELOPER = 'DEV',
   BUSINESS = 'BUSINESS'
+}
+
+export enum ExpertiseLevel {
+  BASIC = 'BASIC',
+  INTERMEDIATE = 'INTERMEDIATE',
+  ADVANCED = 'ADVANCED'
 }
 
 export enum PandaPersona {
@@ -24,6 +29,7 @@ export enum PandaPersona {
 }
 
 export enum ViewMode {
+  LANDING = 'LANDING',
   CHAT = 'מרחב שיחה',
   PROJECT_DASHBOARD = 'ניהול פרויקט',
   VOICE = 'ממשק קולי',
@@ -36,58 +42,27 @@ export enum ViewMode {
   DASHBOARD = 'לוח בקרה',
   DOC_ANALYSIS = 'ניהול מסמכים',
   TEMPLATES = 'ספריית תבניות',
-  NEURAL_MIND = 'מוח עצבי' // New visualization view
+  NEURAL_MIND = 'מוח עצבי',
+  ADMIN_PANEL = 'ניהול מערכת'
 }
 
-export interface ThoughtStep {
-  id: string;
-  label: string;
-  status: 'pending' | 'active' | 'completed';
-  description?: string;
-}
-
-export interface Attachment {
-  id: string;
-  name: string;
-  type: string;
-  data: string; // base64
-  size: number;
-}
-
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  mode: AIModelMode;
-  timestamp: string;
-  attachments?: Attachment[];
-  groundingSources?: { title: string; uri: string }[];
-  thoughtProcess?: ThoughtStep[]; // New field for visualizing AI logic
-  sentiment?: string;
-  relatedQuestions?: string[];
-}
-
-export interface ChatSession {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-  projectId?: string;
-  persona: PandaPersona;
-  lastUpdate: string;
-  isPinned?: boolean;
-  isArchived?: boolean;
-}
-
-export interface LegalContent {
-  terms: string;
-  privacy: string;
-  accessibility: string;
-  contact: string;
+export interface DynamicContent {
+  landingTitle: string;
+  landingSubtitle: string;
+  landingDesc: string;
+  dashboardWelcome: string;
+  dashboardSubWelcome: string;
+  toolsTitle: string;
+  newChatBtn: string;
+  newProjectBtn: string;
+  footerCopyright: string;
 }
 
 export interface AppSettings {
   language: 'he' | 'en' | 'es';
   theme: 'midnight';
+  themeMode: 'light' | 'dark' | 'system';
+  expertiseLevel: ExpertiseLevel;
   enableSearch: boolean;
   codeExecutionEnabled: boolean;
   autoSave: boolean;
@@ -99,20 +74,66 @@ export interface AppSettings {
   bargeInSensitivity: number;
   userRole: UserRole;
   userBio: string;
-  legalContent: LegalContent;
+  brandVoice: string;
+  legalContent: {
+    terms: string;
+    privacy: string;
+    accessibility: string;
+    contact: string;
+    mobile: string;
+    email: string;
+    address: string;
+    waLink: string;
+    mapEmbed: string;
+  };
+  dynamicContent: DynamicContent;
+  isAdmin: boolean;
+  customLogoUrl?: string;
 }
 
 export interface Project {
   id: string;
   name: string;
   description: string;
+  icon: string;
   files: any[];
+  linkedChatIds: string[];
   createdAt: string;
-  environment?: {
-    framework: string;
-    libraries: string[];
-    target: string;
-  };
+}
+
+export interface ThoughtStep {
+  id: string;
+  label: string;
+  status: 'pending' | 'active' | 'completed';
+  description?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  mode: AIModelMode;
+  timestamp: string;
+  attachments?: any[];
+  thoughtProcess?: ThoughtStep[];
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  projectId?: string;
+  persona: PandaPersona;
+  lastUpdate: string;
+  isPinned?: boolean;
+}
+
+export interface APIConfig {
+  id: string;
+  name: string;
+  provider: string;
+  apiKey: string;
+  status: 'active' | 'inactive';
 }
 
 export interface MessageSettings {
@@ -121,29 +142,25 @@ export interface MessageSettings {
   emotion: 'professional' | 'warm' | 'sharp' | 'neutral';
   strategicGoal: string;
   format: string;
+  length: 'short' | 'medium' | 'long';
+  audience: string;
 }
 
 export interface StrategicMessageResult {
   content: string;
   successProbability: number;
   predictedSentiment: string;
+  predictedResponse: string;
   reasoning: string;
 }
 
-export interface APIConfig {
-  id: string;
-  name: string;
-  baseUrl?: string;
-  authHeader?: string;
-  provider: 'google' | 'openai' | 'anthropic' | 'groq' | 'mistral';
-  apiKey: string;
-  status: 'active' | 'testing' | 'inactive';
-  latency?: number;
-  description?: string;
-}
-
 declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
   interface Window {
     webkitAudioContext: typeof AudioContext;
+    aistudio?: AIStudio;
   }
 }

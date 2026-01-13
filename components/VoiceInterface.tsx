@@ -8,28 +8,58 @@ import { translations } from '../utils/translations';
 interface VoiceInterfaceProps {
   appSettings: AppSettings;
   onSaveAsChat: (history: {role: string, text: string}[]) => void;
+  onBack: () => void;
 }
 
-interface TranscriptionMessage {
-  role: 'user' | 'assistant';
-  text: string;
-  isFinal: boolean;
-}
-
-const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ appSettings, onSaveAsChat }) => {
+const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ appSettings, onSaveAsChat, onBack }) => {
   const [isActive, setIsActive] = useState(false);
   const [status, setStatus] = useState<'idle' | 'connecting' | 'listening' | 'speaking'>('idle');
-  const [history, setHistory] = useState<TranscriptionMessage[]>([]);
+  const [history, setHistory] = useState<{role: 'user' | 'assistant', text: string}[]>([]);
+  const [isMuted, setIsMuted] = useState(false);
   
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const outputAudioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const sessionPromiseRef = useRef<Promise<any> | null>(null);
-  const sourcesRef = useRef(new Set<AudioBufferSourceNode>());
   const nextStartTimeRef = useRef(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const t = translations[appSettings.language] || translations.he;
-  const isRTL = appSettings.language === 'he';
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [history]);
+
+  const drawWaveform = () => {
+    if (!canvasRef.current || !analyserRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const bufferLength = analyserRef.current.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    const draw = () => {
+      requestAnimationFrame(draw);
+      analyserRef.current!.getByteTimeDomainData(dataArray);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = status === 'speaking' ? '#f97316' : '#6366f1';
+      
+      const sliceWidth = canvas.width * 1.0 / 8;
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const v = dataArray[i * 16] / 128.0;
+        const h = Math.max(10, v * 60 * (isActive ? 1 : 0.2));
+        const x = (canvas.width / 2) - 100 + (i * 30);
+        ctx.moveTo(x, (canvas.height / 2) - h / 2);
+        ctx.lineTo(x, (canvas.height / 2) + h / 2);
+      }
+      ctx.stroke();
+    };
+    draw();
+  };
 
   const startSession = async () => {
     try {
@@ -37,9 +67,9 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ appSettings, onSaveAsCh
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      
+      const analyser = inputCtx.createAnalyser();
+      analyserRef.current = analyser;
       audioContextRef.current = inputCtx;
-      outputAudioContextRef.current = outputCtx;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
@@ -49,49 +79,50 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ appSettings, onSaveAsCh
           onopen: () => {
             setStatus('listening');
             const source = inputCtx.createMediaStreamSource(stream);
+            source.connect(analyser);
             const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
             scriptProcessor.onaudioprocess = (e) => {
+              if (isMuted) return;
               const inputData = e.inputBuffer.getChannelData(0);
-              // CRITICAL: Solely rely on sessionPromise resolves and then call `session.sendRealtimeInput`
-              sessionPromise.then(session => {
-                session.sendRealtimeInput({ media: createBlob(inputData) });
-              });
+              sessionPromise.then(session => session.sendRealtimeInput({ media: createBlob(inputData) }));
             };
             source.connect(scriptProcessor);
             scriptProcessor.connect(inputCtx.destination);
+            drawWaveform();
           },
           onmessage: async (msg) => {
             if (msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data) {
               setStatus('speaking');
-              // Scheduled gapless playback
               nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputCtx.currentTime);
               const audioBuffer = await decodeAudioData(decode(msg.serverContent.modelTurn.parts[0].inlineData.data), outputCtx, 24000, 1);
               const source = outputCtx.createBufferSource();
               source.buffer = audioBuffer;
               source.connect(outputCtx.destination);
-              source.addEventListener('ended', () => {
-                sourcesRef.current.delete(source);
-                if (sourcesRef.current.size === 0) setStatus('listening');
-              });
               source.start(nextStartTimeRef.current);
               nextStartTimeRef.current += audioBuffer.duration;
-              sourcesRef.current.add(source);
+              source.onended = () => { if (nextStartTimeRef.current <= outputCtx.currentTime + 0.1) setStatus('listening'); };
             }
-            
-            if (msg.serverContent?.inputTranscription) {
-              updateHistory('user', msg.serverContent.inputTranscription.text, false);
+
+            const inputTrans = msg.serverContent?.inputTranscription?.text;
+            if (inputTrans) {
+              setHistory(prev => {
+                const last = prev[prev.length - 1];
+                if (last && last.role === 'user' && status === 'listening') {
+                   return [...prev.slice(0, -1), {role: 'user', text: inputTrans}];
+                }
+                return [...prev, {role: 'user', text: inputTrans}];
+              });
             }
-            if (msg.serverContent?.outputTranscription) {
-              updateHistory('assistant', msg.serverContent.outputTranscription.text, false);
-            }
-            if (msg.serverContent?.turnComplete) {
-              setHistory(prev => prev.map(h => ({ ...h, isFinal: true })));
-            }
-            if (msg.serverContent?.interrupted) {
-              sourcesRef.current.forEach(s => { try { s.stop(); } catch(e){} });
-              sourcesRef.current.clear();
-              nextStartTimeRef.current = 0;
-              setStatus('listening');
+
+            const outputTrans = msg.serverContent?.outputTranscription?.text;
+            if (outputTrans) {
+               setHistory(prev => {
+                 const last = prev[prev.length - 1];
+                 if (last && last.role === 'assistant') {
+                    return [...prev.slice(0, -1), {role: 'assistant', text: last.text + outputTrans}];
+                 }
+                 return [...prev, {role: 'assistant', text: outputTrans}];
+               });
             }
           },
           onerror: () => stopSession(),
@@ -100,108 +131,93 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ appSettings, onSaveAsCh
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: appSettings.voiceName } } },
-          inputAudioTranscription: {},
+          inputAudioTranscription: { model: 'gemini-2.5-flash-native-audio-preview-12-2025' },
           outputAudioTranscription: {},
-          systemInstruction: `You are PandaAi, an elite real-time assistant. 
-          Respond naturally in ${appSettings.language === 'he' ? 'Hebrew' : 'English'}. 
-          The user is ${appSettings.userBio || 'a valued partner'}.`
+          systemInstruction: `You are PandaAi. Respond in professional Hebrew.`
         }
       });
-
       sessionPromiseRef.current = sessionPromise;
       setIsActive(true);
-    } catch (err) {
-      console.error(err);
-      setStatus('idle');
-    }
-  };
-
-  const updateHistory = (role: 'user' | 'assistant', text: string, isFinal: boolean) => {
-    setHistory(prev => {
-      const last = prev[prev.length - 1];
-      if (last && last.role === role && !last.isFinal) {
-        return [...prev.slice(0, -1), { role, text, isFinal }];
-      }
-      return [...prev, { role, text, isFinal }];
-    });
+    } catch (err) { setStatus('idle'); }
   };
 
   const stopSession = () => {
-    if (sessionPromiseRef.current) {
-      sessionPromiseRef.current.then(session => session.close());
-    }
+    if (sessionPromiseRef.current) sessionPromiseRef.current.then(s => s.close());
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-    [audioContextRef.current, outputAudioContextRef.current].forEach(ctx => ctx?.close());
     setIsActive(false);
     setStatus('idle');
   };
 
-  const handleSave = () => {
-    if (history.length === 0) return;
-    onSaveAsChat(history.map(h => ({ role: h.role, text: h.text })));
-    stopSession();
-  };
-
   return (
-    <div className={`flex-1 flex flex-col items-center justify-center p-6 md:p-12 bg-[#050507] relative overflow-hidden ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
-      <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
-        <div className="flex items-center gap-1.5 h-64">
-           {[...Array(32)].map((_, i) => (
-             <div 
-               key={i} 
-               className={`w-1.5 bg-indigo-500 rounded-full transition-all duration-300 ${status === 'speaking' ? 'animate-pulse' : status === 'listening' ? 'animate-bounce' : 'h-2'}`}
-               style={{ 
-                 height: status === 'speaking' ? `${30 + Math.random() * 70}%` : status === 'listening' ? `${10 + Math.random() * 40}%` : '8px',
-                 animationDelay: `${i * 40}ms`,
-                 animationDuration: status === 'listening' ? '1.5s' : '0.8s'
-               }}
-             />
-           ))}
+    <div className="flex-1 flex flex-col h-full bg-[#050508] relative overflow-hidden text-right font-['Heebo']" dir="rtl">
+      {/* Header */}
+      <div className="h-16 px-6 bg-[#050508] flex items-center justify-between shrink-0 w-full border-b border-white/5 z-10">
+        <div className="flex items-center gap-6">
+          <button onClick={onBack} className="px-6 py-2 bg-white/5 border border-white/10 rounded-xl text-white hover:bg-orange-600 transition-all font-bold text-xs shadow-lg">← חזור</button>
+          <h2 className="text-xl font-black text-white italic uppercase tracking-tighter">צ'אט לייב קולי</h2>
         </div>
       </div>
 
-      <div className="max-w-xl w-full space-y-16 relative z-10 text-center">
-        <div className="space-y-4">
-          <div className="inline-block px-4 py-1 bg-white/5 border border-white/10 rounded-full text-[9px] font-bold text-zinc-500 uppercase tracking-[0.3em]">
-            {t.voiceActive}
-          </div>
-          <h2 className="text-4xl md:text-5xl font-black text-white italic uppercase tracking-tighter">
-            {status === 'idle' ? t.readyTo : status === 'connecting' ? t.connecting : status === 'listening' ? t.listening : t.speaking} <span className="text-indigo-500">{status === 'idle' ? t.engage : t.nexus}</span>
-          </h2>
+      {/* Main Content Area - Flexible */}
+      <div className="flex-1 flex flex-col items-center p-4 overflow-hidden">
+        
+        {/* WAVEFORM */}
+        <div className="w-full max-w-sm aspect-[2/1] flex flex-col items-center justify-center relative mb-4 shrink-0">
+            <div className={`absolute inset-0 bg-gradient-to-br ${status === 'speaking' ? 'from-orange-600/10 to-transparent' : 'from-indigo-600/10 to-transparent'} blur-[80px] rounded-full transition-all duration-1000 ${isActive ? 'opacity-100' : 'opacity-0'}`}></div>
+            <canvas ref={canvasRef} width={300} height={150} className={`w-full h-full relative z-10 transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-30'}`}></canvas>
+            {!isActive && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                 <div className="text-6xl animate-pulse grayscale opacity-50">🐼</div>
+              </div>
+            )}
         </div>
 
-        <div className="flex flex-col items-center gap-10">
+        {/* TRANSCRIPTION BOX - Flex 1 to fill space but scrollable */}
+        <div className="w-full max-w-2xl flex-1 min-h-0 bg-white/5 rounded-3xl p-4 border border-white/10 shadow-inner flex flex-col">
+            <h3 className="text-xs font-black text-zinc-500 uppercase mb-2 px-2 shrink-0">תמלול בזמן אמת</h3>
+            <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar space-y-3 px-2">
+                {history.length > 0 ? (
+                history.map((h, i) => (
+                    <div key={i} className={`flex flex-col ${h.role === 'user' ? 'items-end' : 'items-start'} animate-in fade-in duration-300`}>
+                        <div className={`px-4 py-2 rounded-2xl text-sm font-medium ${h.role === 'user' ? 'bg-orange-600/20 text-orange-100' : 'bg-white/10 text-white'}`}>
+                        <span className="text-[9px] font-black uppercase opacity-60 block mb-1 text-right">{h.role === 'user' ? 'אתה' : 'פנדה'}</span>
+                        <p className="text-right leading-relaxed">{h.text}</p>
+                        </div>
+                    </div>
+                ))
+                ) : (
+                    <div className="h-full flex items-center justify-center text-zinc-600 text-sm italic">
+                        {isActive ? 'מקשיב...' : 'היסטוריית השיחה תופיע כאן'}
+                    </div>
+                )}
+            </div>
+        </div>
+      </div>
+
+      {/* FIXED FOOTER CONTROLS */}
+      <div className="shrink-0 p-6 bg-[#0a0a0c] border-t border-white/10 flex justify-center items-center gap-8 md:gap-12 z-20">
            <button 
-             onClick={isActive ? stopSession : startSession}
-             className={`w-32 h-32 md:w-40 md:h-40 rounded-full flex items-center justify-center transition-all duration-700 shadow-2xl relative group ${isActive ? 'bg-red-500/20 border-red-500/40 animate-pulse' : 'bg-indigo-600/10 border-indigo-500/20 hover:bg-indigo-600/20 hover:scale-105'}`}
-             style={{ border: '2px solid' }}
+             onClick={() => setIsMuted(!isMuted)}
+             className={`p-4 md:p-5 rounded-full transition-all border ${isMuted ? 'bg-red-600 text-white border-red-400' : 'bg-white/5 text-zinc-200 border-white/10 hover:text-white'}`}
+             disabled={!isActive}
            >
-              <div className={`absolute inset-0 rounded-full blur-2xl opacity-20 transition-all ${isActive ? 'bg-red-500 scale-125' : 'bg-indigo-500 group-hover:scale-110'}`}></div>
-              <span className="text-5xl md:text-6xl relative z-10">{isActive ? '⏹️' : '🎙️'}</span>
+             <span className="text-xl md:text-2xl">{isMuted ? '🔇' : '🎙️'}</span>
            </button>
 
-           <div className="space-y-6 w-full">
-              {history.length > 0 && (
-                <div className={`glass p-6 rounded-2xl border border-white/5 bg-white/[0.02] ${isRTL ? 'text-right' : 'text-left'} space-y-4 max-h-[160px] overflow-y-auto custom-scrollbar`}>
-                   {history.map((h, i) => (
-                     <div key={i} className={`text-[11px] font-bold ${h.role === 'user' ? 'text-zinc-500' : 'text-indigo-400'}`}>
-                        <span className={`uppercase opacity-50 ${isRTL ? 'ml-2' : 'mr-2'}`}>{h.role === 'user' ? 'משתמש' : 'מערכת'}:</span>
-                        <span className="italic">"{h.text}"</span>
-                     </div>
-                   ))}
-                </div>
-              )}
+           <button 
+             onClick={isActive ? stopSession : startSession}
+             className={`w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center transition-all duration-300 shadow-2xl relative ${isActive ? 'bg-white text-black scale-105' : 'bg-orange-600 text-white hover:scale-105'}`}
+           >
+             <span className="text-3xl md:text-4xl relative z-10">{isActive ? '⏹️' : '🎤'}</span>
+           </button>
 
-              {isActive ? (
-                <div className="flex justify-center gap-4">
-                  <button onClick={handleSave} className="px-10 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-xl transition-all text-[10px] uppercase tracking-widest">{t.saveSession}</button>
-                  <button onClick={stopSession} className="px-10 py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all">{t.disconnect}</button>
-                </div>
-              ) : (
-                <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-[0.4em]">{t.startSession}</p>
-              )}
-           </div>
-        </div>
+           <button 
+             onClick={() => onSaveAsChat(history)}
+             className="p-4 md:p-5 rounded-full bg-white/5 text-zinc-200 border border-white/10 hover:text-white transition-all disabled:opacity-20"
+             disabled={history.length === 0}
+           >
+             <span className="text-xl md:text-2xl">💾</span>
+           </button>
       </div>
     </div>
   );

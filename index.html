@@ -21,9 +21,31 @@
         color: #f8fafc; 
         font-family: 'Heebo', sans-serif; 
         overflow: hidden;
+        width: 100vw;
         height: 100vh;
+        max-width: 100vw;
+        overflow-x: hidden;
       }
-      #root { height: 100%; }
+      #root { 
+        height: 100%; 
+        width: 100%;
+        max-width: 100vw;
+        overflow-x: hidden;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
     </style>
   <script type="importmap">
 {

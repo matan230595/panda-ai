@@ -36,10 +36,9 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, customLogo, i
       
       {showText && (
         <div className="flex flex-col text-right">
-          <div dir="ltr" className={`font-black tracking-tighter leading-none text-white uppercase italic ${textSizes[size]}`}>
-            Panda<span className="text-orange-500">Ai</span>
+          <div dir="ltr" className={`font-black tracking-tighter leading-none uppercase italic ${textSizes[size]}`}>
+            <span className="text-white">Panda</span><span className="text-orange-600">Ai</span>
           </div>
-          <div className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.4em] mt-1 mr-1">סטודיו עלית</div>
         </div>
       )}
     </div>

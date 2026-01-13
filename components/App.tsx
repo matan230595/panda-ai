@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { ViewMode, ChatSession, Project, AppSettings, UserRole, PandaPersona, ExpertiseLevel, AIModelMode } from './types';
-import { translations } from './utils/translations';
+import { ViewMode, ChatSession, Project, AppSettings, UserRole, PandaPersona, ExpertiseLevel, AIModelMode } from '../types';
+import { translations } from '../utils/translations';
 import { ToastContainer } from './components/Toast';
 
 // Lazy Load Components
@@ -21,6 +21,8 @@ const LegalModal = React.lazy(() => import('./components/LegalModal'));
 const AdminPanel = React.lazy(() => import('./components/AdminPanel'));
 
 const App: React.FC = () => {
+  // FORCE TRUE - NO LANDING PAGE
+  const [hasStarted, setHasStarted] = useState<boolean>(true);
   const [view, setView] = useState<ViewMode>(ViewMode.DASHBOARD);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
@@ -31,6 +33,8 @@ const App: React.FC = () => {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [showProjectModal, setShowProjectModal] = useState(false);
+  
+  // Manage Legal Modal State
   const [legalModal, setLegalModal] = useState<{ isOpen: boolean; type: 'terms' | 'privacy' | 'accessibility' | 'contact' }>({ isOpen: false, type: 'terms' });
   
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
@@ -81,22 +85,29 @@ const App: React.FC = () => {
     <Suspense fallback={<div className="h-screen bg-[#050508] flex items-center justify-center text-white font-black italic">טוען מערכת...</div>}>
       <div className="flex h-screen bg-[#050508] text-white overflow-hidden" dir="rtl">
         
-        {/* SIDEBAR IS FIRST ELEMENT FOR CORRECT RTL FLEXBOX POSITIONING */}
-        <Sidebar 
-          currentView={view} 
-          setView={setView} 
-          sessions={sessions} 
-          activeSessionId={activeSessionId || ''} 
-          onSelectSession={setActiveSessionId} 
-          onDeleteSession={id => setSessions(s => s.filter(x => x.id !== id))} 
-          onNewChat={() => handleNewChat()} 
-          isOpen={isSidebarOpen} 
-          onClose={() => setIsSidebarOpen(false)} 
-          appSettings={appSettings} 
-        />
+        {/* SIDEBAR - Fixed Right in RTL */}
+        <aside className={`fixed md:relative right-0 top-0 bottom-0 z-[200] h-full transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}`}>
+          <Sidebar 
+            currentView={view} 
+            setView={(v) => { setView(v); setIsSidebarOpen(false); }}
+            sessions={sessions} 
+            activeSessionId={activeSessionId || ''} 
+            onSelectSession={(id) => { setActiveSessionId(id); setIsSidebarOpen(false); }}
+            onDeleteSession={id => setSessions(s => s.filter(x => x.id !== id))} 
+            onNewChat={() => { handleNewChat(); setIsSidebarOpen(false); }}
+            isOpen={isSidebarOpen} 
+            onClose={() => setIsSidebarOpen(false)} 
+            appSettings={appSettings} 
+          />
+        </aside>
+
+        {/* OVERLAY FOR MOBILE SIDEBAR */}
+        {isSidebarOpen && (
+           <div className="fixed inset-0 bg-black/80 z-[150] md:hidden" onClick={() => setIsSidebarOpen(false)}></div>
+        )}
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 flex flex-col min-w-0 relative bg-[#050508]">
+        <main className="flex-1 flex flex-col min-w-0 relative bg-[#050508] h-full overflow-hidden">
           {view === ViewMode.DASHBOARD && <Dashboard setView={setView} appSettings={appSettings} onUpdateSettings={setAppSettings} onNewChat={handleNewChat} onNewProject={() => setShowProjectModal(true)} onOpenMenu={() => setIsSidebarOpen(true)} onOpenLegal={type => setLegalModal({ isOpen: true, type })} />}
           {view === ViewMode.CHAT && <ChatArea session={currentSession} setView={setView} onNewChat={handleNewChat} onUpdateSession={u => setSessions(s => s.map(x => x.id === u.id ? u : x))} appSettings={appSettings} onUpdateSettings={setAppSettings} apiConfigs={[]} onOpenMenu={() => setIsSidebarOpen(true)} />}
           {view === ViewMode.DOC_ANALYSIS && <DocumentAnalyzer onBack={() => setView(ViewMode.DASHBOARD)} appSettings={appSettings} />}
@@ -112,7 +123,7 @@ const App: React.FC = () => {
 
         {showProjectModal && <ProjectCreationModal onClose={() => setShowProjectModal(false)} onCreate={p => { setProjects([...projects, p]); setShowProjectModal(false); }} />}
         
-        {/* LEGAL MODAL - Fixed with appSettings prop */}
+        {/* LEGAL MODAL - Forced High Z-Index */}
         {legalModal.isOpen && (
           <LegalModal 
             isOpen={legalModal.isOpen} 
@@ -122,6 +133,7 @@ const App: React.FC = () => {
             appSettings={appSettings}
           />
         )}
+        
         <ToastContainer toasts={[]} />
       </div>
     </Suspense>

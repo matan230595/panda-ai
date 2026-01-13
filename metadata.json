@@ -1,9 +1,8 @@
 {
-  "name": "PandaAi ",
-  "description": "סביבת עבודה חכמה ויוקרתית מבוססת בינה מלאכותית לבניית אפליקציות, כתיבת קוד וניהול תקשורת אסטרטגית.",
+  "name": "PandaAi Elite",
+  "description": "סביבת עבודה אסטרטגית מבוססת בינה מלאכותית לניהול פרויקטים, כתיבה ויצירה.",
   "requestFramePermissions": [
     "microphone",
-    "camera",
-    "geolocation"
+    "camera"
   ]
 }

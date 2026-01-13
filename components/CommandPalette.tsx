@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ViewMode, Project } from '../types';
 
@@ -56,9 +57,9 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onClose, onAction, proj
   }, [onClose, filteredActions, selectedIndex, onAction]);
 
   return (
-    <div className="fixed inset-0 z-[5000] flex items-start justify-center pt-32 px-6 bg-black/60 backdrop-blur-xl animate-in fade-in duration-300">
-      <div className="w-full max-w-2xl bg-[#0a0a14] rounded-[2rem] border border-white/10 shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-white/5 flex items-center gap-4">
+    <div className="fixed inset-0 z-[5000] flex items-start justify-center pt-32 px-6 bg-black/80 backdrop-blur-xl animate-in fade-in duration-300">
+      <div className="w-full max-w-2xl bg-[#0a0a14] rounded-[2rem] border border-white/20 shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-white/5 flex items-center gap-4 bg-[#0a0a14]">
           <span className="text-xl opacity-40">🔍</span>
           <input 
             ref={inputRef}
@@ -72,7 +73,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onClose, onAction, proj
           </div>
         </div>
 
-        <div className="max-h-[400px] overflow-y-auto p-3 space-y-1">
+        <div className="max-h-[400px] overflow-y-auto p-3 space-y-1 bg-[#0a0a14]">
           {filteredActions.length === 0 ? (
             <div className="py-10 text-center text-zinc-600 font-bold uppercase text-[10px] tracking-widest">No results found</div>
           ) : (
@@ -95,17 +96,17 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onClose, onAction, proj
           )}
         </div>
 
-        <div className="p-4 bg-black/40 border-t border-white/5 flex justify-between items-center px-8">
+        <div className="p-4 bg-[#050508] border-t border-white/5 flex justify-between items-center px-8">
            <div className="flex gap-4">
               <div className="flex items-center gap-2">
                  <span className="text-[9px] font-black text-zinc-700 uppercase">Select</span>
-                 <div className="w-4 h-4 bg-white/5 border border-white/10 rounded flex items-center justify-center text-[8px]">⏎</div>
+                 <div className="w-4 h-4 bg-white/5 border border-white/10 rounded flex items-center justify-center text-[8px] text-zinc-500">⏎</div>
               </div>
               <div className="flex items-center gap-2">
                  <span className="text-[9px] font-black text-zinc-700 uppercase">Navigate</span>
                  <div className="flex gap-1">
-                    <div className="w-4 h-4 bg-white/5 border border-white/10 rounded flex items-center justify-center text-[8px]">↑</div>
-                    <div className="w-4 h-4 bg-white/5 border border-white/10 rounded flex items-center justify-center text-[8px]">↓</div>
+                    <div className="w-4 h-4 bg-white/5 border border-white/10 rounded flex items-center justify-center text-[8px] text-zinc-500">↑</div>
+                    <div className="w-4 h-4 bg-white/5 border border-white/10 rounded flex items-center justify-center text-[8px] text-zinc-500">↓</div>
                  </div>
               </div>
            </div>

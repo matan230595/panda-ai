@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { ViewMode, ChatSession, AppSettings, Project } from '../types';
+import React, { useState, useRef } from 'react';
+import { ViewMode, ChatSession, AppSettings } from '../types';
 import Logo from './Logo';
 import { translations } from '../utils/translations';
 
@@ -11,32 +11,19 @@ interface SidebarProps {
   activeSessionId: string;
   onSelectSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
-  onTogglePin: (id: string) => void;
-  onToggleArchive: (id: string) => void;
   onNewChat: () => void;
   onClose?: () => void;
   isOpen?: boolean;
   appSettings: AppSettings;
-  customLogo?: string;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
   currentView, setView, sessions, activeSessionId, onSelectSession, 
-  onDeleteSession, onTogglePin, onToggleArchive, onNewChat, onClose, isOpen, appSettings, customLogo 
+  onDeleteSession, onNewChat, onClose, isOpen, appSettings
 }) => {
-  const [search, setSearch] = useState('');
-  const [showArchived, setShowArchived] = useState(false);
-  
-  const t = translations[appSettings.language] || translations.he;
-  const isRTL = appSettings.language === 'he';
-
-  const filteredSessions = sessions
-    .filter(s => (showArchived ? s.isArchived : !s.isArchived) && s.title.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
-      return new Date(b.lastUpdate).getTime() - new Date(a.lastUpdate).getTime();
-    });
+  const t = translations.he;
+  const [displayCount, setDisplayCount] = useState(15);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const navItems = [
     { mode: ViewMode.DASHBOARD, icon: '🏠', label: t.dashboard },
@@ -51,69 +38,87 @@ const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <>
-      {isOpen && <div className="fixed inset-0 bg-black/95 backdrop-blur-sm z-[450] md:hidden" onClick={onClose} />}
-      
-      {/* Sidebar Container - RTL logic fixed to ensure right alignment for Hebrew */}
-      <div className={`fixed md:relative inset-y-0 ${isRTL ? 'right-0 border-l' : 'left-0 border-r'} z-[500] w-[280px] h-full bg-[#040406] border-white/10 flex flex-col transition-transform duration-300 shadow-2xl ${isOpen ? 'translate-x-0' : (isRTL ? 'translate-x-full md:translate-x-0' : '-translate-x-full md:translate-x-0')}`} dir={isRTL ? 'rtl' : 'ltr'}>
-        <div className="p-6 flex flex-col h-full space-y-8">
-          
-          <div className="flex justify-between items-center shrink-0 border-b border-white/5 pb-6">
-            <Logo size="sm" showText={true} customLogo={customLogo} />
-            <button onClick={onClose} className="md:hidden text-zinc-300 p-2 text-2xl">✕</button>
+    <div className="w-[280px] h-full bg-[#0a0a0c] border-l border-white/10 flex flex-col shadow-2xl" dir="rtl">
+        <div className="p-4 flex flex-col h-full overflow-hidden">
+          <div className="flex justify-between items-center mb-6 shrink-0 pt-2 px-1">
+            <div 
+              onClick={() => { setView(ViewMode.DASHBOARD); if(onClose) onClose(); }} 
+              className="cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              <Logo size="sm" customLogo={appSettings.customLogoUrl} />
+            </div>
+            {/* Close button mostly for mobile */}
+            <button onClick={onClose} className="md:hidden text-zinc-300 hover:text-white p-2 text-2xl font-bold bg-white/5 rounded-lg">✕</button>
           </div>
-
+          
           <button 
-            onClick={() => { onNewChat(); if(onClose) onClose(); }}
-            className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white font-black rounded-xl shadow-[0_0_20px_rgba(249,115,22,0.3)] transition-all active:scale-95 flex items-center justify-center gap-3 text-sm"
+            onClick={() => { onNewChat(); if(onClose) onClose(); }} 
+            className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl transition-all flex items-center justify-center gap-3 mb-6 font-black text-sm shadow-lg shadow-orange-900/20"
           >
+            <span className="text-lg">➕</span>
             <span>{t.newChat}</span>
-            <span className="text-lg">⚡</span>
           </button>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-8 px-1">
-            <div className="space-y-1.5">
-              {navItems.map(item => (
-                <button 
-                  key={item.mode} 
-                  onClick={() => { setView(item.mode); if(onClose) onClose(); }}
-                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all border group ${currentView === item.mode ? 'bg-orange-600/15 border-orange-500/30 text-white' : 'border-transparent text-zinc-400 hover:bg-white/5 hover:text-white'}`}
-                >
-                  <span className={`text-xl transition-transform group-hover:scale-110 ${currentView === item.mode ? 'text-orange-500' : 'text-zinc-500'}`}>{item.icon}</span>
-                  <span className={`text-sm font-black ${currentView === item.mode ? 'text-white' : 'text-zinc-400 group-hover:text-white'}`}>{item.label}</span>
-                </button>
-              ))}
-            </div>
-            
-            <div className="pt-8 border-t border-white/5 space-y-5">
-              <div className="flex items-center justify-between px-2">
-                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{t.recentHistory}</span>
-                <button onClick={() => setShowArchived(!showArchived)} className="text-[10px] text-orange-500 font-black hover:underline tracking-tighter uppercase">
-                  {showArchived ? t.back : t.archive}
-                </button>
-              </div>
+          <div 
+            ref={scrollContainerRef}
+            className="flex-1 overflow-y-auto custom-scrollbar space-y-1 pr-1"
+          >
+            {navItems.map(item => (
+              <button 
+                key={item.mode} 
+                onClick={() => { setView(item.mode); if(onClose) onClose(); }} 
+                className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${
+                  currentView === item.mode 
+                    ? 'bg-white/10 text-white font-bold' 
+                    : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
+                }`}
+              >
+                <span className="text-xl w-6 text-center">{item.icon}</span>
+                <span className="text-sm">{item.label}</span>
+              </button>
+            ))}
+
+            <div className="pt-8 mt-6 border-t border-white/10">
+              <h4 className="px-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-4">{t.chatHistory}</h4>
               <div className="space-y-1">
-                {filteredSessions.map(s => (
+                {sessions.length === 0 && <p className="text-zinc-600 text-xs px-4 italic">אין היסטוריה עדיין...</p>}
+                {sessions.slice(0, displayCount).map((s) => (
                   <div key={s.id} className="group relative">
-                    <button onClick={() => { onSelectSession(s.id); setView(ViewMode.CHAT); if(onClose) onClose(); }}
-                      className={`w-full ${isRTL ? 'text-right' : 'text-left'} px-4 py-3 rounded-xl truncate text-[11px] font-bold transition-all ${activeSessionId === s.id && currentView === ViewMode.CHAT ? 'bg-white/10 text-white shadow-inner' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
-                      {s.isPinned && <span className={`text-orange-500 ${isRTL ? 'ml-2' : 'mr-2'}`}>📌</span>} {s.title}
+                    <button 
+                      onClick={() => { onSelectSession(s.id); setView(ViewMode.CHAT); if(onClose) onClose(); }}
+                      className={`w-full text-right px-4 py-3 rounded-xl text-xs font-medium truncate pr-8 pl-4 transition-all ${
+                        activeSessionId === s.id 
+                          ? 'bg-orange-600/10 text-orange-400 border border-orange-500/10' 
+                          : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
+                      }`}
+                    >
+                      {s.title || 'שיחה ללא שם'}
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); onDeleteSession(s.id); }} 
+                      className="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-500 p-1.5 transition-all"
+                    >
+                      ✕
                     </button>
                   </div>
                 ))}
               </div>
             </div>
           </div>
-          <div className="pt-6 mt-auto border-t border-white/5 flex items-center justify-between">
-            <button onClick={() => { setView(ViewMode.SETTINGS); if(onClose) onClose(); }} className="flex items-center gap-3 text-zinc-400 hover:text-white transition-colors group">
-              <span className="text-xl group-hover:rotate-12 transition-transform">⚙️</span>
-              <span className="text-xs font-black uppercase tracking-widest">{t.settings}</span>
+
+          <div className="pt-4 mt-auto border-t border-white/10 shrink-0">
+            <button 
+              onClick={() => { setView(ViewMode.SETTINGS); if(onClose) onClose(); }} 
+              className={`w-full flex items-center gap-3 px-4 py-4 rounded-xl transition-all ${
+                currentView === ViewMode.SETTINGS ? 'bg-white/10 text-white' : 'text-zinc-500 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <span className="text-xl">⚙️</span>
+              <span className="text-sm font-bold">{t.settings}</span>
             </button>
-            <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_12px_#10b981] animate-pulse"></div></div>
           </div>
         </div>
-      </div>
-    </>
+    </div>
   );
 };
 

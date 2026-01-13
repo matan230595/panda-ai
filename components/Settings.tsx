@@ -18,29 +18,24 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdate, onBack }) => {
     onUpdate({ ...settings, [key]: value });
   };
 
-  const updateLegalContent = (key: keyof typeof settings.legalContent, value: string) => {
-    onUpdate({
-      ...settings,
-      legalContent: {
-        ...settings.legalContent,
-        [key]: value
-      }
-    });
+  const handleReset = () => {
+    if (confirm('האם אתה בתוך שברצונך לאפס את המערכת? כל השיחות וההגדרות יימחקו.')) {
+      localStorage.clear();
+      window.location.reload();
+    }
   };
 
-  const isRTL = settings.language === 'he';
-
   return (
-    <div className={`flex-1 overflow-y-auto bg-[#050508] p-6 lg:p-12 custom-scrollbar ${isRTL ? 'text-right' : 'text-left'}`} dir={isRTL ? "rtl" : "ltr"}>
+    <div className="flex-1 overflow-y-auto bg-[#050508] p-6 lg:p-12 custom-scrollbar text-right" dir="rtl">
       <div className="max-w-4xl mx-auto space-y-10 pb-20">
         
         <div className="flex items-center justify-between border-b border-white/10 pb-6">
           <div className="flex items-center gap-4">
             <button onClick={onBack} className="p-3 bg-white/5 rounded-xl text-zinc-400 hover:text-white transition-all">
-               {isRTL ? '←' : '→'}
+               →
             </button>
             <h2 className="text-2xl font-black text-white italic">
-               {isRTL ? 'הגדרות מערכת' : 'System Settings'}
+               הגדרות מערכת
             </h2>
           </div>
         </div>
@@ -48,10 +43,10 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdate, onBack }) => {
         {/* Tabs Navigation */}
         <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 w-fit overflow-x-auto max-w-full">
           {[
-            { id: 'system', label: isRTL ? 'מערכת וזיכרון' : 'System & Memory' },
-            { id: 'voice', label: isRTL ? 'קול ודיבור' : 'Voice & Speech' },
-            { id: 'interface', label: isRTL ? 'ממשק ושפה' : 'Interface & Language' },
-            { id: 'legal', label: isRTL ? 'משפטי ותוכן' : 'Legal & Content' }
+            { id: 'system', label: 'מערכת וזיכרון' },
+            { id: 'voice', label: 'קול ודיבור' },
+            { id: 'interface', label: 'ממשק ותצוגה' },
+            { id: 'legal', label: 'פרטיות ואיפוס' }
           ].map(tab => (
             <button 
               key={tab.id}
@@ -76,31 +71,31 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdate, onBack }) => {
                      <div className="text-3xl">🧠</div>
                      <div className="space-y-1">
                         <h3 className="text-lg font-black text-white uppercase italic">
-                           {isRTL ? 'זיכרון ליבה (System Bio)' : 'Core Memory (System Bio)'}
+                           זיכרון ליבה (System Bio)
                         </h3>
                         <p className="text-xs text-zinc-400">
-                           {isRTL ? 'המידע שתכתוב כאן יוזרק לכל שיחה. המודל ידע מי אתה, מה העסק שלך ומה המטרות שלך באופן אוטומטי.' : 'Information here is injected into every chat. The model will know who you are and your goals automatically.'}
+                           המידע שתכתוב כאן יוזרק לכל שיחה. המודל ידע מי אתה, מה העסק שלך ומה המטרות שלך באופן אוטומטי.
                         </p>
                      </div>
                   </div>
                   <textarea 
                     value={settings.userBio || ''}
                     onChange={e => updateField('userBio', e.target.value)}
-                    placeholder={isRTL ? "למשל: אני מפתח Fullstack שמתמחה ב-React. אני בונה סטארטאפ בתחום הרפואה. הסגנון שלי הוא תמציתי וטכני." : "E.g., I am a Fullstack developer specialized in React..."}
+                    placeholder="למשל: אני מפתח Fullstack שמתמחה ב-React. אני בונה סטארטאפ בתחום הרפואה. הסגנון שלי הוא תמציתי וטכני."
                     className="w-full h-32 bg-black/40 border border-white/10 rounded-2xl p-4 text-white text-sm focus:border-indigo-500/50 outline-none resize-none font-medium"
                   />
                </div>
 
                <div className="glass p-8 rounded-3xl border border-white/5 space-y-6">
                   <h3 className="text-lg font-black text-white uppercase italic">
-                     {isRTL ? 'תצורת מנוע AI' : 'AI Engine Config'}
+                     תצורת מנוע AI
                   </h3>
                   
                   <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
                        <div>
-                          <div className="text-sm font-bold text-white">Google Search Grounding</div>
-                          <div className="text-[10px] text-zinc-500">{isRTL ? 'אפשר למודל לגשת למידע עדכני בזמן אמת' : 'Allow model to access real-time web info'}</div>
+                          <div className="text-sm font-bold text-white">חיפוש מידע ברשת (Grounding)</div>
+                          <div className="text-[10px] text-zinc-500">אפשר למודל לגשת למידע עדכני בזמן אמת</div>
                        </div>
                        <label className="relative inline-flex items-center cursor-pointer">
                           <input type="checkbox" checked={settings.enableSearch} onChange={e => updateField('enableSearch', e.target.checked)} className="sr-only peer" />
@@ -110,12 +105,12 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdate, onBack }) => {
 
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
                        <div>
-                          <div className="text-sm font-bold text-white">Code Execution (Python)</div>
-                          <div className="text-[10px] text-zinc-500">{isRTL ? 'מאפשר למודל לבצע חישובים וניתוח נתונים' : 'Allows model to run code and analyze data'}</div>
+                          <div className="text-sm font-bold text-white">שיקוף עצמי (Self-Reflection)</div>
+                          <div className="text-[10px] text-zinc-500">המודל יבקר את התשובות של עצמו לפני השליחה (איטי יותר אך מדויק)</div>
                        </div>
                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" checked={settings.codeExecutionEnabled} onChange={e => updateField('codeExecutionEnabled', e.target.checked)} className="sr-only peer" />
-                          <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+                          <input type="checkbox" checked={settings.selfReflect} onChange={e => updateField('selfReflect', e.target.checked)} className="sr-only peer" />
+                          <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                        </label>
                     </div>
                   </div>
@@ -126,114 +121,94 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdate, onBack }) => {
           {/* Voice Settings */}
           {activeTab === 'voice' && (
              <div className="glass p-8 rounded-3xl border border-white/5 space-y-8">
-                <div className="space-y-4">
-                   <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-1">
-                      {isRTL ? 'קול המודל' : 'Voice Persona'}
-                   </label>
-                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      {['Zephyr', 'Puck', 'Charon', 'Fenrir'].map(voice => (
-                        <button 
-                          key={voice}
-                          onClick={() => updateField('voiceName', voice)}
-                          className={`p-3 rounded-xl border text-[11px] font-bold transition-all ${settings.voiceName === voice ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg' : 'bg-white/5 border-transparent text-zinc-500 hover:text-white'}`}
-                        >
-                          {voice}
-                        </button>
-                      ))}
+                <div className="flex items-start gap-4">
+                   <div className="text-3xl">🎙️</div>
+                   <div>
+                      <h3 className="text-lg font-black text-white uppercase italic">הגדרות קול</h3>
+                      <p className="text-xs text-zinc-400">התאמה אישית של ממשק הדיבור בזמן אמת</p>
                    </div>
                 </div>
-                
-                <div className="space-y-4">
-                   <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-1">
-                      {isRTL ? 'רגישות התפרצות (Barge-in)' : 'Barge-in Sensitivity'}
-                   </label>
-                   <input 
-                     type="range" min="0" max="1" step="0.1" 
-                     value={settings.bargeInSensitivity} 
-                     onChange={e => updateField('bargeInSensitivity', parseFloat(e.target.value))}
-                     className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                   />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-zinc-500 uppercase px-1">קול הדובר (Voice)</label>
+                      <div className="grid grid-cols-2 gap-2">
+                         {['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir'].map(voice => (
+                           <button 
+                             key={voice}
+                             onClick={() => updateField('voiceName', voice)}
+                             className={`p-3 rounded-xl text-xs font-bold transition-all border ${settings.voiceName === voice ? 'bg-orange-600 border-orange-500 text-white' : 'bg-white/5 border-white/5 text-zinc-400 hover:bg-white/10'}`}
+                           >
+                              {voice}
+                           </button>
+                         ))}
+                      </div>
+                   </div>
+
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-zinc-500 uppercase px-1">טון דיבור</label>
+                      <select 
+                        value={settings.voiceTone}
+                        onChange={e => updateField('voiceTone', e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white outline-none text-sm font-bold"
+                      >
+                         <option value="professional">מקצועי וענייני</option>
+                         <option value="calm">רגוע ושלו</option>
+                         <option value="aggressive">מהיר ואנרגטי</option>
+                      </select>
+                   </div>
                 </div>
              </div>
           )}
 
-          {/* Interface & Language Settings */}
+          {/* Interface Settings */}
           {activeTab === 'interface' && (
              <div className="glass p-8 rounded-3xl border border-white/5 space-y-8">
                 <div className="space-y-2">
-                   <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-1">
-                      {isRTL ? 'שפת ממשק' : 'Interface Language'}
-                   </label>
-                   <div className="grid grid-cols-3 gap-4">
-                      <button 
-                         onClick={() => updateField('language', 'he')}
-                         className={`p-4 rounded-xl border text-sm font-bold transition-all flex flex-col items-center gap-2 ${settings.language === 'he' ? 'bg-orange-600 border-orange-500 text-white' : 'bg-white/5 border-white/10 text-zinc-400'}`}
-                      >
-                         <span className="text-2xl">🇮🇱</span>
-                         <span>עברית</span>
-                      </button>
-                      <button 
-                         onClick={() => updateField('language', 'en')}
-                         className={`p-4 rounded-xl border text-sm font-bold transition-all flex flex-col items-center gap-2 ${settings.language === 'en' ? 'bg-orange-600 border-orange-500 text-white' : 'bg-white/5 border-white/10 text-zinc-400'}`}
-                      >
-                         <span className="text-2xl">🇺🇸</span>
-                         <span>English</span>
-                      </button>
-                      <button 
-                         onClick={() => updateField('language', 'es')}
-                         className={`p-4 rounded-xl border text-sm font-bold transition-all flex flex-col items-center gap-2 ${settings.language === 'es' ? 'bg-orange-600 border-orange-500 text-white' : 'bg-white/5 border-white/10 text-zinc-400'}`}
-                      >
-                         <span className="text-2xl">🇪🇸</span>
-                         <span>Español</span>
-                      </button>
-                   </div>
+                   <h3 className="text-lg font-black text-white uppercase italic">עוצמת ממשק (UI Intensity)</h3>
+                   <p className="text-xs text-zinc-400">שליטה בכמות האפקטים והאנימציות במערכת</p>
                 </div>
-                <div className="space-y-2">
-                   <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-1">
-                      {isRTL ? 'עוצמה ויזואלית' : 'UI Intensity'}
-                   </label>
+
+                <div className="space-y-4">
+                   <div className="flex justify-between text-xs font-bold text-zinc-500">
+                      <span>מינימליסטי</span>
+                      <span>עתידני</span>
+                   </div>
                    <input 
-                     type="range" min="0" max="100" 
+                     type="range" 
+                     min="0" 
+                     max="100" 
                      value={settings.uiIntensity} 
                      onChange={e => updateField('uiIntensity', parseInt(e.target.value))}
-                     className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                     className="w-full accent-orange-500 h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer"
                    />
                 </div>
              </div>
           )}
 
-          {/* Legal Document Editing - NEW */}
+          {/* Legal / Reset */}
           {activeTab === 'legal' && (
-             <div className="space-y-8">
-                <div className="p-6 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-sm text-indigo-200">
-                   ℹ️ {isRTL ? 'כאן תוכל לערוך את הטקסטים המופיעים במודאלים של הצהרת הנגישות, פרטיות ותנאי השימוש. השינויים נשמרים מקומית.' : 'Here you can edit the text for Terms, Privacy, and Accessibility modals. Changes are saved locally.'}
-                </div>
+             <div className="space-y-6">
+                <div className="glass p-8 rounded-3xl border border-red-500/20 bg-red-500/5 space-y-6">
+                   <div className="flex items-start gap-4">
+                      <div className="text-3xl">⚠️</div>
+                      <div>
+                         <h3 className="text-lg font-black text-white uppercase italic">אזור סכנה</h3>
+                         <p className="text-xs text-zinc-400">פעולות אלו הן בלתי הפיכות</p>
+                      </div>
+                   </div>
+                   
+                   <p className="text-xs text-zinc-300 leading-relaxed">
+                      איפוס המערכת ימחק את כל ההיסטוריה, הפרויקטים, הגדרות המפתח והמידע האישי מהדפדפן שלך.
+                   </p>
 
-                <div className="glass p-8 rounded-3xl border border-white/5 space-y-6">
-                   <h3 className="text-lg font-black text-white uppercase italic">{isRTL ? 'תנאי שימוש (Terms)' : 'Terms of Use'}</h3>
-                   <textarea 
-                     value={settings.legalContent.terms}
-                     onChange={e => updateLegalContent('terms', e.target.value)}
-                     className="w-full h-48 bg-black/40 border border-white/10 rounded-2xl p-4 text-white text-xs font-mono focus:border-orange-500/50 outline-none resize-none leading-relaxed"
-                   />
-                </div>
-
-                <div className="glass p-8 rounded-3xl border border-white/5 space-y-6">
-                   <h3 className="text-lg font-black text-white uppercase italic">{isRTL ? 'מדיניות פרטיות (Privacy)' : 'Privacy Policy'}</h3>
-                   <textarea 
-                     value={settings.legalContent.privacy}
-                     onChange={e => updateLegalContent('privacy', e.target.value)}
-                     className="w-full h-48 bg-black/40 border border-white/10 rounded-2xl p-4 text-white text-xs font-mono focus:border-orange-500/50 outline-none resize-none leading-relaxed"
-                   />
-                </div>
-
-                <div className="glass p-8 rounded-3xl border border-white/5 space-y-6">
-                   <h3 className="text-lg font-black text-white uppercase italic">{isRTL ? 'הצהרת נגישות (Accessibility)' : 'Accessibility Statement'}</h3>
-                   <textarea 
-                     value={settings.legalContent.accessibility}
-                     onChange={e => updateLegalContent('accessibility', e.target.value)}
-                     className="w-full h-48 bg-black/40 border border-white/10 rounded-2xl p-4 text-white text-xs font-mono focus:border-orange-500/50 outline-none resize-none leading-relaxed"
-                   />
+                   <button 
+                     onClick={handleReset}
+                     className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-black rounded-xl shadow-xl transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+                   >
+                      <span>🗑️</span>
+                      <span>מחיקת כל הנתונים ואיפוס</span>
+                   </button>
                 </div>
              </div>
           )}
