@@ -1,12 +1,20 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { LOCAL_STORAGE_KEYS } from '../utils/constants';
 
 interface OnboardingProps {
   onComplete: () => void;
 }
 
 const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => {
+    const savedStep = localStorage.getItem(LOCAL_STORAGE_KEYS.ONBOARDING_STEP);
+    return savedStep ? parseInt(savedStep, 10) : 0;
+  });
+  
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ONBOARDING_STEP, step.toString());
+  }, [step]);
 
   const steps = [
     {
@@ -35,11 +43,17 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     }
   ];
 
+  const handleCompletion = () => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ONBOARDING, 'true');
+    localStorage.removeItem(LOCAL_STORAGE_KEYS.ONBOARDING_STEP);
+    onComplete();
+  };
+
   const next = () => {
-    if (step < steps.length - 1) setStep(step + 1);
-    else {
-      localStorage.setItem('panda_onboarding_v1', 'true');
-      onComplete();
+    if (step < steps.length - 1) {
+      setStep(step + 1);
+    } else {
+      handleCompletion();
     }
   };
 
@@ -70,7 +84,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
               {step === steps.length - 1 ? "בוא נתחיל! 🚀" : "המשך לשלב הבא"}
             </button>
             {step < steps.length - 1 && (
-              <button onClick={onComplete} className="px-10 py-5 text-zinc-600 hover:text-white transition-all text-sm font-black uppercase tracking-widest">דלג</button>
+              <button onClick={handleCompletion} className="px-10 py-5 text-zinc-600 hover:text-white transition-all text-sm font-black uppercase tracking-widest">דלג</button>
             )}
           </div>
 

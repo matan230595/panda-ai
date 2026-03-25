@@ -1,225 +1,260 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI, Modality } from '@google/genai';
+import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { createBlob, decode, decodeAudioData } from '../services/audio';
-import { AppSettings } from '../types';
-import { translations } from '../utils/translations';
+import { getAI } from '../services/gemini';
+import { AppSettings, ViewMode } from '../types';
+import { useAppSettings, useChat, useUI, useApi } from '../contexts/AppContext';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
-interface VoiceInterfaceProps {
-  appSettings: AppSettings;
-  onSaveAsChat: (history: {role: string, text: string}[]) => void;
-  onBack: () => void;
-}
+const Waveform: React.FC<{ color: string }> = ({ color }) => (
+    <div className="flex justify-center items-center h-full w-full gap-1.5">
+        {[...Array(5)].map((_, i) => (
+            <div
+                key={i}
+                className="w-3 rounded-full"
+                style={{
+                    backgroundColor: color,
+                    animation: `wave 1.2s ease-in-out ${i * 0.1}s infinite`,
+                    height: `${Math.random() * 40 + 20}px`
+                }}
+            ></div>
+        ))}
+        <style>{`
+            @keyframes wave {
+                0%, 100% { transform: scaleY(0.5); }
+                50% { transform: scaleY(1.5); }
+            }
+        `}</style>
+    </div>
+);
 
-const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ appSettings, onSaveAsChat, onBack }) => {
-  const [isActive, setIsActive] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'connecting' | 'listening' | 'speaking'>('idle');
-  const [history, setHistory] = useState<{role: 'user' | 'assistant', text: string}[]>([]);
-  const [isMuted, setIsMuted] = useState(false);
+const VoiceInterface: React.FC = () => {
+  const { appSettings } = useAppSettings();
+  const { newChat } = useChat();
+  const { setView, showToast } = useUI();
+  const { apiConfigs } = useApi();
   
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [status, setStatus] = useState<'idle' | 'connecting' | 'listening' | 'speaking' | 'error'>('idle');
+  const [history, setHistory] = useState<{role: 'user' | 'assistant', text: string}[]>([]);
+  const [currentUserText, setCurrentUserText] = useState('');
+  const [currentAssistantText, setCurrentAssistantText] = useState('');
+  const [isMuted, setIsMuted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  
+  const exitModalRef = useFocusTrap<HTMLDivElement>();
+  
   const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
+  const outputAudioContextRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const sessionPromiseRef = useRef<Promise<any> | null>(null);
   const nextStartTimeRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const isCleaningUp = useRef(false);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [history]);
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [history, currentUserText, currentAssistantText]);
 
-  const drawWaveform = () => {
-    if (!canvasRef.current || !analyserRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const bufferLength = analyserRef.current.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    const draw = () => {
-      requestAnimationFrame(draw);
-      analyserRef.current!.getByteTimeDomainData(dataArray);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      ctx.lineWidth = 4;
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = status === 'speaking' ? '#f97316' : '#6366f1';
-      
-      const sliceWidth = canvas.width * 1.0 / 8;
-      ctx.beginPath();
-      for (let i = 0; i < 8; i++) {
-        const v = dataArray[i * 16] / 128.0;
-        const h = Math.max(10, v * 60 * (isActive ? 1 : 0.2));
-        const x = (canvas.width / 2) - 100 + (i * 30);
-        ctx.moveTo(x, (canvas.height / 2) - h / 2);
-        ctx.lineTo(x, (canvas.height / 2) + h / 2);
-      }
-      ctx.stroke();
-    };
-    draw();
+  useEffect(() => () => { fullCleanup(); }, []);
+
+  const fullCleanup = () => {
+    if (isCleaningUp.current) return;
+    isCleaningUp.current = true;
+    
+    sessionPromiseRef.current?.then(s => s.close()).catch(() => {});
+    sessionPromiseRef.current = null;
+    
+    processorRef.current?.disconnect();
+    processorRef.current = null;
+    
+    sourceRef.current?.disconnect();
+    sourceRef.current = null;
+    
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    
+    audioContextRef.current?.close().catch(() => {});
+    audioContextRef.current = null;
+    
+    outputAudioContextRef.current?.close().catch(() => {});
+    outputAudioContextRef.current = null;
+
+    setStatus('idle');
+    isCleaningUp.current = false;
   };
 
   const startSession = async () => {
+    setStatus('connecting');
+    setHistory([]);
+    setCurrentUserText('');
+    setCurrentAssistantText('');
+    setErrorMessage(null);
+    
     try {
-      setStatus('connecting');
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-      const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      const analyser = inputCtx.createAnalyser();
-      analyserRef.current = analyser;
-      audioContextRef.current = inputCtx;
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+      const ai = getAI(apiConfigs);
+      streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      outputAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
 
-      const sessionPromise = ai.live.connect({
+      sessionPromiseRef.current = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
         callbacks: {
           onopen: () => {
             setStatus('listening');
-            const source = inputCtx.createMediaStreamSource(stream);
-            source.connect(analyser);
-            const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
-            scriptProcessor.onaudioprocess = (e) => {
-              if (isMuted) return;
-              const inputData = e.inputBuffer.getChannelData(0);
-              sessionPromise.then(session => session.sendRealtimeInput({ media: createBlob(inputData) }));
+            if (!audioContextRef.current || !streamRef.current) return;
+            const source = audioContextRef.current.createMediaStreamSource(streamRef.current);
+            const scriptProcessor = audioContextRef.current.createScriptProcessor(4096, 1, 1);
+            scriptProcessor.onaudioprocess = (event) => {
+              const inputData = event.inputBuffer.getChannelData(0);
+              const pcmBlob = createBlob(inputData);
+              sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ audio: pcmBlob }));
             };
             source.connect(scriptProcessor);
-            scriptProcessor.connect(inputCtx.destination);
-            drawWaveform();
+            scriptProcessor.connect(audioContextRef.current.destination);
+            sourceRef.current = source;
+            processorRef.current = scriptProcessor;
           },
-          onmessage: async (msg) => {
-            if (msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data) {
+          onmessage: async (msg: LiveServerMessage) => {
+            if (msg.serverContent?.inputTranscription?.text) {
+              setCurrentUserText(prev => prev + msg.serverContent!.inputTranscription!.text);
+            }
+            if (msg.serverContent?.outputTranscription?.text) {
               setStatus('speaking');
-              nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputCtx.currentTime);
-              const audioBuffer = await decodeAudioData(decode(msg.serverContent.modelTurn.parts[0].inlineData.data), outputCtx, 24000, 1);
-              const source = outputCtx.createBufferSource();
-              source.buffer = audioBuffer;
-              source.connect(outputCtx.destination);
-              source.start(nextStartTimeRef.current);
-              nextStartTimeRef.current += audioBuffer.duration;
-              source.onended = () => { if (nextStartTimeRef.current <= outputCtx.currentTime + 0.1) setStatus('listening'); };
+              setCurrentAssistantText(prev => prev + msg.serverContent!.outputTranscription!.text);
             }
-
-            const inputTrans = msg.serverContent?.inputTranscription?.text;
-            if (inputTrans) {
-              setHistory(prev => {
-                const last = prev[prev.length - 1];
-                if (last && last.role === 'user' && status === 'listening') {
-                   return [...prev.slice(0, -1), {role: 'user', text: inputTrans}];
-                }
-                return [...prev, {role: 'user', text: inputTrans}];
+            if (msg.serverContent?.turnComplete) {
+              setCurrentUserText(prevUser => {
+                setCurrentAssistantText(prevAssistant => {
+                  if (prevUser.trim() || prevAssistant.trim()) {
+                    setHistory(prevHistory => [
+                      ...prevHistory,
+                      { role: 'user', text: prevUser },
+                      { role: 'assistant', text: prevAssistant }
+                    ]);
+                  }
+                  return ''; // Clear assistant text
+                });
+                return ''; // Clear user text
               });
+              setStatus('listening');
             }
-
-            const outputTrans = msg.serverContent?.outputTranscription?.text;
-            if (outputTrans) {
-               setHistory(prev => {
-                 const last = prev[prev.length - 1];
-                 if (last && last.role === 'assistant') {
-                    return [...prev.slice(0, -1), {role: 'assistant', text: last.text + outputTrans}];
-                 }
-                 return [...prev, {role: 'assistant', text: outputTrans}];
-               });
+            const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+            if (audioData && outputAudioContextRef.current) {
+              const audioCtx = outputAudioContextRef.current;
+              const audioBuffer = await decodeAudioData(decode(audioData), audioCtx, 24000, 1);
+              const source = audioCtx.createBufferSource();
+              source.buffer = audioBuffer;
+              source.connect(audioCtx.destination);
+              const now = audioCtx.currentTime;
+              const startTime = Math.max(now, nextStartTimeRef.current);
+              source.start(startTime);
+              nextStartTimeRef.current = startTime + audioBuffer.duration;
             }
           },
-          onerror: () => stopSession(),
-          onclose: () => stopSession()
+          onerror: (e: ErrorEvent) => { setErrorMessage("שגיאת חיבור"); setStatus('error'); fullCleanup(); },
+          onclose: () => { setStatus('idle'); },
         },
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: appSettings.voiceName } } },
-          inputAudioTranscription: { model: 'gemini-2.5-flash-native-audio-preview-12-2025' },
+          inputAudioTranscription: {},
           outputAudioTranscription: {},
-          systemInstruction: `You are PandaAi. Respond in professional Hebrew.`
         }
       });
-      sessionPromiseRef.current = sessionPromise;
-      setIsActive(true);
-    } catch (err) { setStatus('idle'); }
+    } catch (err) {
+      setErrorMessage("לא ניתנה הרשאת מיקרופון");
+      setStatus('error');
+      fullCleanup();
+    }
   };
 
-  const stopSession = () => {
-    if (sessionPromiseRef.current) sessionPromiseRef.current.then(s => s.close());
-    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-    setIsActive(false);
-    setStatus('idle');
+  const handleEndCall = () => {
+    if (history.length > 0 || currentUserText.trim() || currentAssistantText.trim()) {
+      setShowExitConfirm(true);
+    } else {
+      fullCleanup();
+      setView(ViewMode.DASHBOARD);
+    }
+  };
+  
+  const confirmEndCall = () => {
+      fullCleanup();
+      setView(ViewMode.DASHBOARD);
+  };
+
+  const handleSaveAndEnd = () => {
+      const fullHistory = [...history];
+      if (currentUserText.trim()) fullHistory.push({ role: 'user', text: currentUserText });
+      if (currentAssistantText.trim()) fullHistory.push({ role: 'assistant', text: currentAssistantText });
+
+      if (fullHistory.length > 0) {
+          const chatContent = fullHistory.map(h => `${h.role === 'user' ? 'אני' : 'פנדה'}: ${h.text}`).join('\n\n');
+          newChat(chatContent, 'שיחה קולית');
+          showToast('השיחה נשמרה בהצלחה בצ\'אט', 'success');
+      }
+      fullCleanup();
+      setTimeout(() => setView(ViewMode.CHAT), 300);
+  };
+  
+  const renderCenterContent = () => {
+    switch (status) {
+      case 'idle':
+        return <button onClick={startSession} className="w-48 h-48 bg-emerald-500 rounded-full flex flex-col items-center justify-center text-white font-black text-2xl shadow-[0_0_50px_rgba(16,185,129,0.5)] animate-pulse">התחל שיחה</button>;
+      case 'connecting':
+        return <div className="w-48 h-48 border-4 border-dashed border-white/20 rounded-full animate-spin flex items-center justify-center text-white">מחבר...</div>;
+      case 'listening':
+        return <div className="w-48 h-48 relative bg-blue-500 rounded-full flex flex-col items-center justify-center text-white font-black text-2xl shadow-[0_0_50px_rgba(59,130,246,0.5)] transition-all scale-105"><div className="w-full h-full rounded-full bg-blue-500/50 animate-ping absolute"></div>מאזין...</div>;
+      case 'speaking':
+        return <div className="w-48 h-48 bg-indigo-500 rounded-full flex flex-col items-center justify-center text-white font-black text-2xl shadow-[0_0_50px_rgba(99,102,241,0.5)] transition-all scale-110 overflow-hidden"><Waveform color="rgba(255, 255, 255, 0.7)" /></div>;
+      case 'error':
+        return <div className="w-48 h-48 bg-red-800 rounded-full flex flex-col items-center justify-center p-4 text-center"><p className="font-bold text-lg">שגיאה</p><p className="text-sm">{errorMessage}</p><button onClick={startSession} className="mt-2 text-xs underline">נסה שוב</button></div>;
+    }
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#050508] relative overflow-hidden text-right font-['Heebo']" dir="rtl">
-      {/* Header */}
-      <div className="h-16 px-6 bg-[#050508] flex items-center justify-between shrink-0 w-full border-b border-white/5 z-10">
-        <div className="flex items-center gap-6">
-          <button onClick={onBack} className="px-6 py-2 bg-white/5 border border-white/10 rounded-xl text-white hover:bg-orange-600 transition-all font-bold text-xs shadow-lg">← חזור</button>
-          <h2 className="text-xl font-black text-white italic uppercase tracking-tighter">צ'אט לייב קולי</h2>
+    <>
+    <div className="fixed inset-0 z-[2000] bg-black text-white flex flex-col font-['Heebo']" dir="rtl" role="dialog" aria-label="שיחה קולית" aria-modal="true">
+      <header className="p-6 flex justify-between items-center bg-black/30 backdrop-blur-md">
+        <h2 className="text-2xl font-black italic">PANDA <span className="text-orange-500">VOICE</span></h2>
+        <div className="flex items-center gap-4">
+          <button onClick={handleSaveAndEnd} className="px-5 py-2 bg-white/10 rounded-xl text-xs font-bold hover:bg-white/20" aria-label="שמור וסיים שיחה">שמור וצא</button>
+          <button onClick={handleEndCall} className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center font-black" aria-label="סיים שיחה ללא שמירה">✕</button>
         </div>
-      </div>
-
-      {/* Main Content Area - Flexible */}
-      <div className="flex-1 flex flex-col items-center p-4 overflow-hidden">
-        
-        {/* WAVEFORM */}
-        <div className="w-full max-w-sm aspect-[2/1] flex flex-col items-center justify-center relative mb-4 shrink-0">
-            <div className={`absolute inset-0 bg-gradient-to-br ${status === 'speaking' ? 'from-orange-600/10 to-transparent' : 'from-indigo-600/10 to-transparent'} blur-[80px] rounded-full transition-all duration-1000 ${isActive ? 'opacity-100' : 'opacity-0'}`}></div>
-            <canvas ref={canvasRef} width={300} height={150} className={`w-full h-full relative z-10 transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-30'}`}></canvas>
-            {!isActive && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                 <div className="text-6xl animate-pulse grayscale opacity-50">🐼</div>
-              </div>
-            )}
+      </header>
+      <main className="flex-1 flex flex-col justify-end p-6" role="main">
+        <div ref={scrollRef} className="max-h-[50vh] overflow-y-auto custom-scrollbar space-y-4 text-center pb-8" aria-live="polite">
+          {history.map((h, i) => (
+            <p key={i} className={`text-2xl font-bold ${h.role === 'user' ? 'text-zinc-400' : 'text-white'}`}>{h.text}</p>
+          ))}
+          {currentUserText && <p className="text-2xl font-bold text-zinc-400">{currentUserText}</p>}
+          {currentAssistantText && <p className="text-2xl font-bold text-white">{currentAssistantText}</p>}
         </div>
-
-        {/* TRANSCRIPTION BOX - Flex 1 to fill space but scrollable */}
-        <div className="w-full max-w-2xl flex-1 min-h-0 bg-white/5 rounded-3xl p-4 border border-white/10 shadow-inner flex flex-col">
-            <h3 className="text-xs font-black text-zinc-500 uppercase mb-2 px-2 shrink-0">תמלול בזמן אמת</h3>
-            <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar space-y-3 px-2">
-                {history.length > 0 ? (
-                history.map((h, i) => (
-                    <div key={i} className={`flex flex-col ${h.role === 'user' ? 'items-end' : 'items-start'} animate-in fade-in duration-300`}>
-                        <div className={`px-4 py-2 rounded-2xl text-sm font-medium ${h.role === 'user' ? 'bg-orange-600/20 text-orange-100' : 'bg-white/10 text-white'}`}>
-                        <span className="text-[9px] font-black uppercase opacity-60 block mb-1 text-right">{h.role === 'user' ? 'אתה' : 'פנדה'}</span>
-                        <p className="text-right leading-relaxed">{h.text}</p>
-                        </div>
-                    </div>
-                ))
-                ) : (
-                    <div className="h-full flex items-center justify-center text-zinc-600 text-sm italic">
-                        {isActive ? 'מקשיב...' : 'היסטוריית השיחה תופיע כאן'}
-                    </div>
-                )}
+        <div className="flex justify-center items-center h-64">
+          {renderCenterContent()}
+        </div>
+      </main>
+      <footer className="p-6 flex justify-center items-center bg-black/30">
+        <button onClick={() => setIsMuted(!isMuted)} className="px-6 py-3 bg-white/10 rounded-full text-sm font-bold" aria-label={isMuted ? 'בטל השתקה' : 'השתק'}>{isMuted ? 'בטל השתקה' : 'השתק'}</button>
+      </footer>
+    </div>
+    {showExitConfirm && (
+        <div className="fixed inset-0 z-[5000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in" dir="rtl" onClick={() => setShowExitConfirm(false)} role="alertdialog" aria-labelledby="exit-confirm-title" aria-describedby="exit-confirm-desc" aria-modal="true">
+            <div ref={exitModalRef} className="max-w-md w-full bg-[#2a0a0a] p-10 rounded-[3rem] border-2 border-red-500/50 space-y-6 text-center shadow-[0_0_100px_rgba(239,68,68,0.3)] animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+                <div className="text-5xl" aria-hidden="true">⚠️</div>
+                <h3 id="exit-confirm-title" className="text-2xl font-black text-white uppercase italic tracking-tight">לסיים שיחה?</h3>
+                <p id="exit-confirm-desc" className="text-red-200 leading-relaxed font-medium">השיחה הנוכחית לא תישמר. האם אתה בטוח שברצונך לצאת?</p>
+                <div className="flex gap-4 pt-4">
+                    <button onClick={confirmEndCall} className="flex-1 py-4 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl shadow-xl transition-all uppercase tracking-widest text-sm">כן, סיים וצא</button>
+                    <button onClick={() => setShowExitConfirm(false)} className="flex-1 py-4 bg-white/10 hover:bg-white/20 text-white font-black rounded-2xl transition-all uppercase tracking-widest text-xs">ביטול</button>
+                </div>
             </div>
         </div>
-      </div>
-
-      {/* FIXED FOOTER CONTROLS */}
-      <div className="shrink-0 p-6 bg-[#0a0a0c] border-t border-white/10 flex justify-center items-center gap-8 md:gap-12 z-20">
-           <button 
-             onClick={() => setIsMuted(!isMuted)}
-             className={`p-4 md:p-5 rounded-full transition-all border ${isMuted ? 'bg-red-600 text-white border-red-400' : 'bg-white/5 text-zinc-200 border-white/10 hover:text-white'}`}
-             disabled={!isActive}
-           >
-             <span className="text-xl md:text-2xl">{isMuted ? '🔇' : '🎙️'}</span>
-           </button>
-
-           <button 
-             onClick={isActive ? stopSession : startSession}
-             className={`w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center transition-all duration-300 shadow-2xl relative ${isActive ? 'bg-white text-black scale-105' : 'bg-orange-600 text-white hover:scale-105'}`}
-           >
-             <span className="text-3xl md:text-4xl relative z-10">{isActive ? '⏹️' : '🎤'}</span>
-           </button>
-
-           <button 
-             onClick={() => onSaveAsChat(history)}
-             className="p-4 md:p-5 rounded-full bg-white/5 text-zinc-200 border border-white/10 hover:text-white transition-all disabled:opacity-20"
-             disabled={history.length === 0}
-           >
-             <span className="text-xl md:text-2xl">💾</span>
-           </button>
-      </div>
-    </div>
+    )}
+    </>
   );
 };
 

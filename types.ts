@@ -43,7 +43,9 @@ export enum ViewMode {
   DOC_ANALYSIS = 'ניהול מסמכים',
   TEMPLATES = 'ספריית תבניות',
   NEURAL_MIND = 'מוח עצבי',
-  ADMIN_PANEL = 'ניהול מערכת'
+  ADMIN_PANEL = 'ניהול מערכת',
+  PANDA_CODER = 'סטודיו קוד',
+  ACADEMY = 'האקדמיה'
 }
 
 export interface DynamicContent {
@@ -56,6 +58,38 @@ export interface DynamicContent {
   newChatBtn: string;
   newProjectBtn: string;
   footerCopyright: string;
+  
+  // Editable Nav Items
+  navDashboard: string;
+  navChat: string;
+  navTemplates: string;
+  navDocs: string;
+  navProjects: string;
+  navVoice: string;
+  navPrompt: string;
+  navImage: string;
+  navMessage: string;
+  navPandaCoder: string;
+  navAcademy: string;
+
+  // Editable Tool Titles
+  toolStrategy: string;
+  toolDocs: string;
+  toolProjects: string;
+  toolArt: string;
+  toolVoice: string;
+  toolVideo: string;
+  toolPrompt: string;
+  toolMessage: string;
+  toolTemplates: string;
+  toolPandaCoder: string;
+
+  // Editable Model Names
+  modeStandard: string;
+  modeThinking: string;
+  modeResearch: string;
+  modeVision: string;
+  modeAgentic: string;
 }
 
 export interface AppSettings {
@@ -108,14 +142,21 @@ export interface ThoughtStep {
   description?: string;
 }
 
+export interface AIEngine {
+  provider: 'gemini' | 'poe' | 'huggingface' | 'groq' | 'mistral';
+  model?: string; // e.g., 'gemini-pro' or 'claude-3-opus'
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   mode: AIModelMode;
+  engine?: AIEngine;
   timestamp: string;
-  attachments?: any[];
+  attachments?: { data: string; mimeType: string; name: string }[];
   thoughtProcess?: ThoughtStep[];
+  status?: 'sending' | 'sent' | 'error';
 }
 
 export interface ChatSession {
@@ -152,6 +193,18 @@ export interface StrategicMessageResult {
   predictedSentiment: string;
   predictedResponse: string;
   reasoning: string;
+}
+
+export interface ClarifyingQuestion {
+  question: string;
+  answers: string[];
+}
+
+export interface SavedPrompt {
+    id: string;
+    name: string;
+    content: any; // The full cowboy prompt object
+    createdAt: string;
 }
 
 declare global {

@@ -1,15 +1,14 @@
 
 import React, { useState } from 'react';
-import { AppSettings, ViewMode } from '../types';
+import { ViewMode } from '../types';
 import { translations } from '../utils/translations';
+import { useChat, useUI, useAppSettings } from '../contexts/AppContext';
 
-interface TemplatesProps {
-  onSelectPrompt: (prompt: string, title: string) => void;
-  appSettings: AppSettings;
-  setView: (v: ViewMode) => void;
-}
-
-const Templates: React.FC<TemplatesProps> = ({ onSelectPrompt, appSettings, setView }) => {
+const Templates: React.FC = () => {
+  const { newChat } = useChat();
+  const { setView } = useUI();
+  const { appSettings } = useAppSettings();
+  
   const t = translations.he;
   const [activeCategory, setActiveCategory] = useState(t.catAll);
 
@@ -17,6 +16,10 @@ const Templates: React.FC<TemplatesProps> = ({ onSelectPrompt, appSettings, setV
   const templates = t.templateList;
 
   const filtered = activeCategory === t.catAll ? templates : templates.filter(t => t.category === activeCategory);
+
+  const handleSelectPrompt = (prompt: string, title: string) => {
+    newChat(prompt, title);
+  };
 
   return (
     <div className={`flex-1 overflow-y-auto p-6 lg:p-12 bg-[#050508] custom-scrollbar animate-in text-right`} dir="rtl">
@@ -51,7 +54,7 @@ const Templates: React.FC<TemplatesProps> = ({ onSelectPrompt, appSettings, setV
              {filtered.map((item, i) => (
                <button 
                  key={i}
-                 onClick={() => onSelectPrompt(item.prompt, item.title)}
+                 onClick={() => handleSelectPrompt(item.prompt, item.title)}
                  className={`group text-right p-8 rounded-[2.5rem] bg-white/[0.01] border border-white/5 hover:border-orange-500/30 hover:bg-white/[0.03] transition-all duration-500 relative flex flex-col h-full shadow-lg`}
                >
                   <div className="flex items-center justify-between mb-8">

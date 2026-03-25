@@ -57,8 +57,8 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onClose, onAction, proj
   }, [onClose, filteredActions, selectedIndex, onAction]);
 
   return (
-    <div className="fixed inset-0 z-[5000] flex items-start justify-center pt-32 px-6 bg-black/80 backdrop-blur-xl animate-in fade-in duration-300">
-      <div className="w-full max-w-2xl bg-[#0a0a14] rounded-[2rem] border border-white/20 shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-[5000] flex items-start justify-center pt-16 md:pt-32 p-4 md:px-6 bg-black/80 backdrop-blur-xl animate-in fade-in duration-300">
+      <div className="w-full max-w-2xl bg-[#0a0a14] rounded-3xl md:rounded-[2rem] border border-white/20 shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col">
         <div className="p-6 border-b border-white/5 flex items-center gap-4 bg-[#0a0a14]">
           <span className="text-xl opacity-40">🔍</span>
           <input 
@@ -96,8 +96,8 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onClose, onAction, proj
           )}
         </div>
 
-        <div className="p-4 bg-[#050508] border-t border-white/5 flex justify-between items-center px-8">
-           <div className="flex gap-4">
+        <div className="p-4 bg-[#050508] border-t border-white/5 flex justify-between items-center px-4 md:px-8">
+           <div className="hidden sm:flex gap-4">
               <div className="flex items-center gap-2">
                  <span className="text-[9px] font-black text-zinc-700 uppercase">Select</span>
                  <div className="w-4 h-4 bg-white/5 border border-white/10 rounded flex items-center justify-center text-[8px] text-zinc-500">⏎</div>

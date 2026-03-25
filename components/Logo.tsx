@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { PandaAvatar } from './PandaAvatar';
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
@@ -15,6 +16,12 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, customLogo, i
     lg: 'w-24 h-24'
   };
 
+  const avatarSizes = {
+    sm: 24,
+    md: 40,
+    lg: 60
+  };
+
   const textSizes = {
     sm: 'text-xl',
     md: 'text-3xl',
@@ -27,7 +34,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, customLogo, i
         {customLogo ? (
           <img src={customLogo} alt="Logo" className="w-full h-full object-cover" />
         ) : (
-          <span className="relative z-10">🐼</span>
+          <PandaAvatar size={avatarSizes[size]} className="relative z-10" />
         )}
         {isLoading && (
           <div className="absolute inset-0 bg-orange-600/20 animate-ping rounded-full"></div>

@@ -1,10 +1,13 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { ViewMode, ChatSession, Project, AppSettings, UserRole, PandaPersona, ExpertiseLevel, AIModelMode } from './types';
-import { translations } from './utils/translations';
+import { ViewMode } from './types';
+import { useUI, useProjects, useChat } from './contexts/AppContext';
 import { ToastContainer } from './components/Toast';
+import { LOCAL_STORAGE_KEYS } from './utils/constants';
 
 // Lazy Load Components
+import { LoadingScreen } from './components/LoadingScreen';
+
 const Sidebar = React.lazy(() => import('./components/Sidebar'));
 const ChatArea = React.lazy(() => import('./components/ChatArea'));
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -12,119 +15,122 @@ const ProjectDashboard = React.lazy(() => import('./components/ProjectDashboard'
 const VoiceInterface = React.lazy(() => import('./components/VoiceInterface'));
 const Settings = React.lazy(() => import('./components/Settings'));
 const ImageGenerator = React.lazy(() => import('./components/ImageGenerator'));
+const VideoGenerator = React.lazy(() => import('./components/VideoGenerator'));
 const PromptCowboy = React.lazy(() => import('./components/PromptCowboy'));
 const MessageMaster = React.lazy(() => import('./components/MessageMaster'));
 const DocumentAnalyzer = React.lazy(() => import('./components/DocumentAnalyzer'));
 const Templates = React.lazy(() => import('./components/Templates'));
-const ProjectCreationModal = React.lazy(() => import('./components/ProjectCreationModal'));
 const LegalModal = React.lazy(() => import('./components/LegalModal'));
 const AdminPanel = React.lazy(() => import('./components/AdminPanel'));
+const ApiHub = React.lazy(() => import('./components/ApiHub'));
+const Onboarding = React.lazy(() => import('./components/Onboarding'));
+const CommandPalette = React.lazy(() => import('./components/CommandPalette'));
+const PandaCoder = React.lazy(() => import('./components/PandaCoder'));
+const Academy = React.lazy(() => import('./components/Academy'));
 
 const App: React.FC = () => {
-  const [view, setView] = useState<ViewMode>(ViewMode.DASHBOARD);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { view, setView, isSidebarOpen, setIsSidebarOpen, legalModal, toasts, showToast } = useUI();
+  const { projects } = useProjects();
+  const { newChat } = useChat();
   
-  const [sessions, setSessions] = useState<ChatSession[]>(() => 
-    JSON.parse(localStorage.getItem('panda_sessions_v2') || '[]')
-  );
-  
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [showProjectModal, setShowProjectModal] = useState(false);
-  const [legalModal, setLegalModal] = useState<{ isOpen: boolean; type: 'terms' | 'privacy' | 'accessibility' | 'contact' }>({ isOpen: false, type: 'terms' });
-  
-  const [appSettings, setAppSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem('panda_settings_v2');
-    return saved ? JSON.parse(saved) : {
-      language: 'he', theme: 'midnight', themeMode: 'dark', expertiseLevel: ExpertiseLevel.BASIC,
-      enableSearch: true, codeExecutionEnabled: false, autoSave: true, selfReflect: true, autonomousAPIs: false,
-      uiIntensity: 80, voiceName: 'Zephyr', voiceTone: 'professional', bargeInSensitivity: 0.6,
-      userRole: UserRole.BEGINNER, userBio: 'משתמש יקר', brandVoice: '', isAdmin: false,
-      legalContent: { terms: '', privacy: '', accessibility: '', contact: '', mobile: '', email: '', address: '', waLink: '', mapEmbed: '' },
-      dynamicContent: {
-        landingTitle: 'PANDA AI Studio', landingSubtitle: 'סטודיו בינה מלאכותית מקצועי בעברית',
-        landingDesc: 'המערכת המובילה בישראל לניהול משימות ושיחות.',
-        dashboardWelcome: 'ברוך הבא למערכת Panda AI Studio',
-        dashboardSubWelcome: '',
-        toolsTitle: 'סט הכלים של פנדה',
-        newChatBtn: 'שיחה חדשה ⚡',
-        newProjectBtn: 'פרויקט חדש 📁',
-        footerCopyright: 'כל הזכויות שמורות לפנדה סוכנות דיגיטל 2026'
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showPalette, setShowPalette] = useState(false);
+
+  useEffect(() => {
+    const onboardingComplete = localStorage.getItem(LOCAL_STORAGE_KEYS.ONBOARDING) === 'true';
+    if (!onboardingComplete) {
+      setShowOnboarding(true);
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowPalette(p => !p);
       }
     };
-  });
-
-  useEffect(() => {
-    localStorage.setItem('panda_sessions_v2', JSON.stringify(sessions));
-  }, [sessions]);
-
-  useEffect(() => {
-    localStorage.setItem('panda_settings_v2', JSON.stringify(appSettings));
-  }, [appSettings]);
-
-  const handleNewChat = (initialPrompt?: string, title?: string) => {
-    const newSession: ChatSession = {
-      id: Date.now().toString(), 
-      title: title || 'שיחה חדשה', 
-      messages: initialPrompt ? [{ id: '1', role: 'user', content: initialPrompt, mode: AIModelMode.STANDARD, timestamp: new Date().toISOString() }] : [],
-      persona: PandaPersona.STRATEGIST, 
-      lastUpdate: new Date().toISOString()
-    };
-    setSessions(prev => [newSession, ...prev]);
-    setActiveSessionId(newSession.id);
-    setView(ViewMode.CHAT);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+  
+  const handleOnboardingComplete = () => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ONBOARDING, 'true');
+    setShowOnboarding(false);
   };
 
-  const currentSession = sessions.find(s => s.id === activeSessionId) || null;
+  const handleCommandAction = (action: any) => {
+    setShowPalette(false);
+    switch(action.type) {
+      case 'view':
+        setView(action.payload);
+        break;
+      case 'chat':
+        newChat();
+        setView(ViewMode.CHAT);
+        break;
+      case 'project':
+        // A full implementation would open the creation modal.
+        // For now, we navigate to the project dashboard where the user can create one.
+        setView(ViewMode.PROJECT_DASHBOARD);
+        showToast('נווט אל מרכז הפרויקטים ליצירת פרויקט חדש', 'info');
+        break;
+      case 'selectProject':
+         // A full implementation would switch the global project context.
+         // For now, just navigate to the dashboard.
+        setView(ViewMode.PROJECT_DASHBOARD);
+        showToast(`ניווט לפרויקטים. החלפת קונטקסט תתווסף בקרוב!`, 'info');
+        break;
+      default:
+        break;
+    }
+  };
+
+  const renderView = () => {
+    switch (view) {
+      case ViewMode.CHAT: return <ChatArea />;
+      case ViewMode.DASHBOARD: return <Dashboard />;
+      case ViewMode.PROJECT_DASHBOARD: return <ProjectDashboard />;
+      case ViewMode.SETTINGS: return <Settings />;
+      case ViewMode.IMAGE_GEN: return <ImageGenerator />;
+      case ViewMode.VIDEO_GEN: return <VideoGenerator />;
+      case ViewMode.PROMPT_LAB: return <PromptCowboy />;
+      case ViewMode.MESSAGE_GEN: return <MessageMaster />;
+      case ViewMode.DOC_ANALYSIS: return <DocumentAnalyzer />;
+      case ViewMode.TEMPLATES: return <Templates />;
+      case ViewMode.ADMIN_PANEL: return <AdminPanel />;
+      case ViewMode.API_HUB: return <ApiHub />;
+      case ViewMode.PANDA_CODER: return <PandaCoder />;
+      case ViewMode.ACADEMY: return <Academy />;
+      default: return <Dashboard />;
+    }
+  };
+
+  if (view === ViewMode.VOICE) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <VoiceInterface />
+      </Suspense>
+    );
+  }
 
   return (
-    <Suspense fallback={<div className="h-screen bg-[#050508] flex items-center justify-center text-white font-black italic">טוען מערכת...</div>}>
-      <div className="flex h-screen bg-[#050508] text-white overflow-hidden" dir="rtl">
-        
-        {/* SIDEBAR IS FIRST ELEMENT FOR CORRECT RTL FLEXBOX POSITIONING */}
-        <Sidebar 
-          currentView={view} 
-          setView={setView} 
-          sessions={sessions} 
-          activeSessionId={activeSessionId || ''} 
-          onSelectSession={setActiveSessionId} 
-          onDeleteSession={id => setSessions(s => s.filter(x => x.id !== id))} 
-          onNewChat={() => handleNewChat()} 
-          isOpen={isSidebarOpen} 
-          onClose={() => setIsSidebarOpen(false)} 
-          appSettings={appSettings} 
-        />
-
-        {/* MAIN CONTENT */}
-        <main className="flex-1 flex flex-col min-w-0 relative bg-[#050508]">
-          {view === ViewMode.DASHBOARD && <Dashboard setView={setView} appSettings={appSettings} onUpdateSettings={setAppSettings} onNewChat={handleNewChat} onNewProject={() => setShowProjectModal(true)} onOpenMenu={() => setIsSidebarOpen(true)} onOpenLegal={type => setLegalModal({ isOpen: true, type })} />}
-          {view === ViewMode.CHAT && <ChatArea session={currentSession} setView={setView} onNewChat={handleNewChat} onUpdateSession={u => setSessions(s => s.map(x => x.id === u.id ? u : x))} appSettings={appSettings} onUpdateSettings={setAppSettings} apiConfigs={[]} onOpenMenu={() => setIsSidebarOpen(true)} />}
-          {view === ViewMode.DOC_ANALYSIS && <DocumentAnalyzer onBack={() => setView(ViewMode.DASHBOARD)} appSettings={appSettings} />}
-          {view === ViewMode.VOICE && <VoiceInterface onBack={() => setView(ViewMode.DASHBOARD)} appSettings={appSettings} onSaveAsChat={h => handleNewChat(h.map(x => `${x.role === 'user' ? 'אתה' : 'פנדה'}: ${x.text}`).join('\n'), 'שיחה קולית')} />}
-          {view === ViewMode.IMAGE_GEN && <ImageGenerator setView={setView} appSettings={appSettings} />}
-          {view === ViewMode.PROMPT_LAB && <PromptCowboy onBack={() => setView(ViewMode.DASHBOARD)} onTestPrompt={handleNewChat} appSettings={appSettings} />}
-          {view === ViewMode.MESSAGE_GEN && <MessageMaster onBack={() => setView(ViewMode.DASHBOARD)} appSettings={appSettings} />}
-          {view === ViewMode.TEMPLATES && <Templates setView={setView} onSelectPrompt={(p, title) => handleNewChat(p, title)} appSettings={appSettings} />}
-          {view === ViewMode.SETTINGS && <Settings settings={appSettings} onUpdate={setAppSettings} onBack={() => setView(ViewMode.DASHBOARD)} onExport={() => {}} onImport={() => {}} onRecover={() => {}} />}
-          {view === ViewMode.PROJECT_DASHBOARD && <ProjectDashboard projects={projects} sessions={sessions} onUpdateProject={(p) => setProjects(prev => prev.map(x => x.id === p.id ? p : x))} onDeleteProject={id => setProjects(p => p.filter(x => x.id !== id))} onBack={() => setView(ViewMode.DASHBOARD)} onStartChat={(pid) => handleNewChat('', projects.find(p=>p.id===pid)?.name)} onNewProject={() => setShowProjectModal(true)} appSettings={appSettings} />}
-          {view === ViewMode.ADMIN_PANEL && <AdminPanel settings={appSettings} onUpdate={setAppSettings} onBack={() => setView(ViewMode.DASHBOARD)} />}
-        </main>
-
-        {showProjectModal && <ProjectCreationModal onClose={() => setShowProjectModal(false)} onCreate={p => { setProjects([...projects, p]); setShowProjectModal(false); }} />}
-        
-        {/* LEGAL MODAL - Fixed with appSettings prop */}
-        {legalModal.isOpen && (
-          <LegalModal 
-            isOpen={legalModal.isOpen} 
-            type={legalModal.type} 
-            onClose={() => setLegalModal(prev => ({ ...prev, isOpen: false }))} 
-            title={legalModal.type === 'terms' ? translations.he.terms : legalModal.type === 'privacy' ? translations.he.privacy : translations.he.accessibility} 
-            appSettings={appSettings}
-          />
-        )}
-        <ToastContainer toasts={[]} />
-      </div>
-    </Suspense>
+    <div className="flex h-[100dvh] w-full max-w-full overflow-x-hidden bg-[#050508] font-['Heebo']">
+      <Suspense fallback={<LoadingScreen />}>
+        <Sidebar onClose={() => setIsSidebarOpen(false)} isOpen={isSidebarOpen} />
+      </Suspense>
+      <main className="flex-1 flex flex-col h-full min-w-0">
+        <Suspense fallback={<LoadingScreen />}>
+          {renderView()}
+        </Suspense>
+      </main>
+      
+      <ToastContainer toasts={toasts} />
+      
+      <Suspense fallback={<LoadingScreen />}>
+        {legalModal.isOpen && <LegalModal />}
+        {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
+        {showPalette && <CommandPalette onClose={() => setShowPalette(false)} onAction={handleCommandAction} projects={projects} />}
+      </Suspense>
+    </div>
   );
 };
 
