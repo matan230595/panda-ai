@@ -480,7 +480,7 @@ export const generateClarifyingQuestions = async (lazyPrompt: string, apiConfigs
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: 'gemini-3-flash-preview',
             contents: [{ parts: [{ text: `User's initial request: "${lazyPrompt}"\n\nGenerate clarifying questions.` }] }],
             config: { 
                 systemInstruction, 
@@ -526,7 +526,7 @@ export const generateInitialCowboyPrompt = async (lazyPrompt: string, apiConfigs
     
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: 'gemini-3-flash-preview',
             contents: [{ parts: [{ text: `User's request: "${lazyPrompt}"\n\nGenerate the initial cowboy prompt.` }] }],
             config: { 
                 systemInstruction, 
@@ -600,7 +600,7 @@ export const refineCowboyPrompt = async (
     
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: 'gemini-3-flash-preview',
             contents: [{ parts: [{ text: context }] }],
             config: { 
                 systemInstruction,
@@ -641,7 +641,7 @@ export const critiquePrompt = async (components: any, apiConfigs?: APIConfig[]):
     
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: 'gemini-3-flash-preview',
             contents: [{ parts: [{ text: `PROMPT COMPONENTS:\n${JSON.stringify(components, null, 2)}` }] }],
             config: {
                 systemInstruction,
@@ -696,7 +696,7 @@ export const chatRefinePrompt = async (components: any, instruction: string, api
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: 'gemini-3-flash-preview',
             contents: [{ parts: [{ text: instruction }] }],
             config: {
                 systemInstruction,
@@ -736,7 +736,7 @@ export const magicEnhancePrompt = async (text: string, context: string = "", api
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: 'gemini-3-flash-preview',
             contents: [{ parts: [{ text: `TEXT TO ENHANCE: "${text}"\n${context ? `CONTEXT: ${context}` : ""}` }] }],
             config: { systemInstruction }
         });

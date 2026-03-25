@@ -3,6 +3,30 @@ import { ViewMode, AIEngine } from '../types';
 import { generateWebComponent } from '../services/gemini';
 import { useUI, useApi, useAppSettings } from '../contexts/AppContext';
 import { translations } from '../utils/translations';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Info, Download, Copy, Play, Code, FileCode, Cpu, Settings } from 'lucide-react';
+
+const Tooltip = ({ text, children }: { text: string, children: React.ReactNode }) => {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative inline-block" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      {children}
+      <AnimatePresence>
+        {show && (
+          <motion.div 
+            initial={{ opacity: 0, y: 5, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 5, scale: 0.95 }}
+            className="absolute z-[100] bottom-full mb-2 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-zinc-800 border border-white/10 text-white text-[10px] font-bold rounded-lg shadow-2xl whitespace-nowrap pointer-events-none"
+          >
+            {text}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-zinc-800" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 const PandaCoder: React.FC = () => {
   const { setView, showToast } = useUI();
@@ -104,7 +128,12 @@ const PandaCoder: React.FC = () => {
           <h2 className="text-2xl font-black text-white italic">Panda <span className="text-orange-600">Coder</span></h2>
         </div>
         <div className="flex gap-2">
-            <button onClick={handleDownload} className="px-4 py-2 bg-white/5 rounded-xl text-xs font-black border border-white/10">הורד קובץ</button>
+            <Tooltip text="ייצא את כל הקוד לקובץ HTML אחד מוכן להרצה">
+              <button onClick={handleDownload} className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black flex items-center gap-2 shadow-lg shadow-orange-900/20 transition-all">
+                <Download size={14} />
+                ייצא קובץ מוכן
+              </button>
+            </Tooltip>
         </div>
       </header>
       
@@ -124,11 +153,21 @@ const PandaCoder: React.FC = () => {
         <div className="flex-1 lg:w-1/2 flex flex-col border-b lg:border-b-0 lg:border-l border-white/10 min-h-[50vh] lg:min-h-0">
            <div className="p-2 bg-black/30 border-b border-white/10 flex justify-between items-center">
                <div className="flex gap-2">
-                 {([ { id: 'html', label: 'HTML' }, { id: 'css', label: 'CSS' }, { id: 'js', label: 'JS' } ]).map(tab => (
-                   <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-4 py-2 text-xs font-black rounded-lg ${activeTab === tab.id ? 'bg-orange-600 text-white' : 'text-zinc-500 hover:bg-white/10'}`}>{tab.label}</button>
+                 {([ { id: 'html', label: 'HTML', icon: <FileCode size={12} /> }, { id: 'css', label: 'CSS', icon: <Settings size={12} /> }, { id: 'js', label: 'JS', icon: <Cpu size={12} /> } ]).map(tab => (
+                   <Tooltip key={tab.id} text={`ערוך את קוד ה-${tab.label}`}>
+                    <button onClick={() => setActiveTab(tab.id as any)} className={`px-4 py-2 text-xs font-black rounded-lg flex items-center gap-2 transition-all ${activeTab === tab.id ? 'bg-orange-600 text-white' : 'text-zinc-500 hover:bg-white/10'}`}>
+                      {tab.icon}
+                      {tab.label}
+                    </button>
+                   </Tooltip>
                  ))}
                </div>
-               <button onClick={handleCopyCode} className="px-3 py-1.5 bg-white/10 rounded-lg text-xs font-bold text-zinc-300 hover:bg-white/20">העתק</button>
+               <Tooltip text="העתק את הקוד הנוכחי ללוח">
+                <button onClick={handleCopyCode} className="px-3 py-1.5 bg-white/10 rounded-lg text-xs font-bold text-zinc-300 hover:bg-white/20 flex items-center gap-2">
+                  <Copy size={12} />
+                  העתק
+                </button>
+               </Tooltip>
            </div>
            <div className="flex-1 bg-[#1e1e1e]">
               {activeTab === 'html' && <CodeEditor value={htmlCode} onChange={setHtmlCode} language="html" />}
@@ -140,19 +179,28 @@ const PandaCoder: React.FC = () => {
         {/* Command Panel */}
         <div className="lg:w-[350px] flex-shrink-0 bg-[#0d0d0f] p-6 flex flex-col gap-6 lg:border-l border-white/10 min-h-[50vh] lg:min-h-0">
           <h3 className="text-lg font-black text-white uppercase italic">לוח בקרה</h3>
-          <textarea 
-            value={prompt}
-            onChange={e => setPrompt(e.target.value)}
-            placeholder="תאר את הרכיב שברצונך לבנות..."
-            className="w-full flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 text-white outline-none resize-none placeholder-zinc-500"
-          />
-          <button 
-            onClick={handleGenerate} 
-            disabled={loading}
-            className="w-full py-5 bg-orange-600 hover:bg-orange-500 text-white font-black text-lg rounded-xl shadow-lg transition-all"
-          >
-            {loading ? 'בונה...' : 'בנה רכיב 🚀'}
-          </button>
+          <Tooltip text="כתוב כאן מה אתה רוצה לבנות">
+            <textarea 
+              value={prompt}
+              onChange={e => setPrompt(e.target.value)}
+              placeholder="תאר את הרכיב שברצונך לבנות..."
+              className="w-full flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 text-white outline-none resize-none placeholder-zinc-500 focus:border-orange-500 transition-all"
+            />
+          </Tooltip>
+          <Tooltip text="לחץ כאן כדי שה-AI יבנה את הרכיב עבורך">
+            <button 
+              onClick={handleGenerate} 
+              disabled={loading}
+              className="w-full py-5 bg-orange-600 hover:bg-orange-500 text-white font-black text-lg rounded-xl shadow-lg transition-all flex items-center justify-center gap-3"
+            >
+              {loading ? 'בונה...' : (
+                <>
+                  <span>בנה רכיב</span>
+                  <Play size={20} />
+                </>
+              )}
+            </button>
+          </Tooltip>
         </div>
       </div>
     </div>

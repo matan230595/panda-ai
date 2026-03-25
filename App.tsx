@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { ViewMode } from './types';
 import { useUI, useProjects, useChat } from './contexts/AppContext';
 import { ToastContainer } from './components/Toast';
@@ -68,14 +69,10 @@ const App: React.FC = () => {
         setView(ViewMode.CHAT);
         break;
       case 'project':
-        // A full implementation would open the creation modal.
-        // For now, we navigate to the project dashboard where the user can create one.
         setView(ViewMode.PROJECT_DASHBOARD);
         showToast('נווט אל מרכז הפרויקטים ליצירת פרויקט חדש', 'info');
         break;
       case 'selectProject':
-         // A full implementation would switch the global project context.
-         // For now, just navigate to the dashboard.
         setView(ViewMode.PROJECT_DASHBOARD);
         showToast(`ניווט לפרויקטים. החלפת קונטקסט תתווסף בקרוב!`, 'info');
         break;
@@ -84,30 +81,10 @@ const App: React.FC = () => {
     }
   };
 
-  const renderView = () => {
-    switch (view) {
-      case ViewMode.CHAT: return <ChatArea />;
-      case ViewMode.DASHBOARD: return <Dashboard />;
-      case ViewMode.PROJECT_DASHBOARD: return <ProjectDashboard />;
-      case ViewMode.SETTINGS: return <Settings />;
-      case ViewMode.IMAGE_GEN: return <ImageGenerator />;
-      case ViewMode.VIDEO_GEN: return <VideoGenerator />;
-      case ViewMode.PROMPT_LAB: return <PromptCowboy />;
-      case ViewMode.MESSAGE_GEN: return <MessageMaster />;
-      case ViewMode.DOC_ANALYSIS: return <DocumentAnalyzer />;
-      case ViewMode.TEMPLATES: return <Templates />;
-      case ViewMode.ADMIN_PANEL: return <AdminPanel />;
-      case ViewMode.API_HUB: return <ApiHub />;
-      case ViewMode.PANDA_CODER: return <PandaCoder />;
-      case ViewMode.ACADEMY: return <Academy />;
-      default: return <Dashboard />;
-    }
-  };
-
-  if (view === ViewMode.VOICE) {
+  if (showOnboarding) {
     return (
       <Suspense fallback={<LoadingScreen />}>
-        <VoiceInterface />
+        <Onboarding onComplete={handleOnboardingComplete} />
       </Suspense>
     );
   }
@@ -119,7 +96,25 @@ const App: React.FC = () => {
       </Suspense>
       <main className="flex-1 flex flex-col h-full min-w-0">
         <Suspense fallback={<LoadingScreen />}>
-          {renderView()}
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/chat" element={<ChatArea />} />
+            <Route path="/projects" element={<ProjectDashboard />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/image-gen" element={<ImageGenerator />} />
+            <Route path="/video-gen" element={<VideoGenerator />} />
+            <Route path="/prompt" element={<PromptCowboy />} />
+            <Route path="/message-gen" element={<MessageMaster />} />
+            <Route path="/docs" element={<DocumentAnalyzer />} />
+            <Route path="/templates" element={<Templates />} />
+            <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/api-hub" element={<ApiHub />} />
+            <Route path="/coder" element={<PandaCoder />} />
+            <Route path="/academy" element={<Academy />} />
+            <Route path="/voice" element={<VoiceInterface />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </Suspense>
       </main>
       
@@ -127,7 +122,6 @@ const App: React.FC = () => {
       
       <Suspense fallback={<LoadingScreen />}>
         {legalModal.isOpen && <LegalModal />}
-        {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
         {showPalette && <CommandPalette onClose={() => setShowPalette(false)} onAction={handleCommandAction} projects={projects} />}
       </Suspense>
     </div>

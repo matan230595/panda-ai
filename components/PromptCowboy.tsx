@@ -256,10 +256,15 @@ const PromptCowboy: React.FC = () => {
 
   useEffect(() => {
     const key = process.env.API_KEY || process.env.GEMINI_API_KEY;
-    if (!key) {
+    // In AI Studio, the key is often injected but might not be visible to process.env in some contexts
+    // We'll trust the getAI service to handle it, and only show warning if we're sure it's missing
+    // and no user config exists.
+    if (!key && (!apiConfigs || apiConfigs.length === 0)) {
       setApiKeyMissing(true);
+    } else {
+      setApiKeyMissing(false);
     }
-  }, []);
+  }, [apiConfigs]);
 
   // New State for "Maximum Upgrade"
   const [history, setHistory] = useLocalStorageState<PromptComponents[]>('pc_history', []);
@@ -270,6 +275,7 @@ const PromptCowboy: React.FC = () => {
   const [isChatting, setIsChatting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showDeepEngineeringInfo, setShowDeepEngineeringInfo] = useState(false);
   const templatesRef = useRef<HTMLDivElement>(null);
 
   // Keyboard Shortcuts
@@ -352,15 +358,70 @@ const PromptCowboy: React.FC = () => {
   
   const saveModalRef = useFocusTrap<HTMLDivElement>();
 
+  const [showDna, setShowDna] = useState(false);
+
   const radarData = useMemo(() => {
     if (!critique?.dna) return [];
     return [
-      { subject: t.promptClarity, A: critique.dna.clarity * 10, fullMark: 100 },
-      { subject: t.promptContext, A: critique.dna.context * 10, fullMark: 100 },
-      { subject: t.promptPersona, A: critique.dna.persona * 10, fullMark: 100 },
-      { subject: t.promptConstraints, A: critique.dna.constraints * 10, fullMark: 100 },
+      { subject: 'בהירות', A: critique.dna.clarity * 10, fullMark: 100 },
+      { subject: 'הקשר', A: critique.dna.context * 10, fullMark: 100 },
+      { subject: 'פרסונה', A: critique.dna.persona * 10, fullMark: 100 },
+      { subject: 'אילוצים', A: critique.dna.constraints * 10, fullMark: 100 },
     ];
-  }, [critique, t]);
+  }, [critique]);
+
+  const renderDnaAnalysis = () => (
+    <AnimatePresence>
+      {showDna && critique && (
+        <motion.div 
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 mb-4 overflow-hidden"
+        >
+          <div className="flex flex-col md:flex-row gap-6 items-center">
+            <div className="w-full md:w-1/2 h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                  <PolarGrid stroke="#ffffff20" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                  <Radar
+                    name="Prompt DNA"
+                    dataKey="A"
+                    stroke="#f97316"
+                    fill="#f97316"
+                    fillOpacity={0.5}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="w-full md:w-1/2 space-y-3">
+              <h4 className="text-sm font-bold text-orange-500 flex items-center gap-2">
+                <BarChart3 size={16} />
+                ניתוח איכות הפרומפט
+              </h4>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                {critique.feedback || 'הפרומפט שלך נראה מצוין! הוא מכיל את כל המרכיבים הדרושים לתוצאה איכותית.'}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {radarData.map(d => (
+                  <div key={d.subject} className="bg-black/40 p-2 rounded-lg border border-white/5">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] text-zinc-500">{d.subject}</span>
+                      <span className="text-[10px] font-bold text-orange-500">{d.A}%</span>
+                    </div>
+                    <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-full bg-orange-500" style={{ width: `${d.A}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 
   useEffect(() => {
     const handleResize = () => {
@@ -374,6 +435,13 @@ const PromptCowboy: React.FC = () => {
 
   const handleQuickUpgrade = async () => {
     if (!lazyPrompt.trim()) return;
+    if (!apiConfigs || apiConfigs.length === 0) {
+        const hasEnvKey = !!(process.env.API_KEY || process.env.GEMINI_API_KEY);
+        if (!hasEnvKey) {
+            showToast("מפתח API חסר. אנא הגדר מפתח בהגדרות המערכת.", "error");
+            return;
+        }
+    }
     setLoading(true);
     setMode('quick');
     setLoadingMessage("בונה עבורך פרומפט מושלם בשניות...");
@@ -393,6 +461,13 @@ const PromptCowboy: React.FC = () => {
 
   const handleStartEngineering = async () => {
     if (!lazyPrompt.trim()) return;
+    if (!apiConfigs || apiConfigs.length === 0) {
+        const hasEnvKey = !!(process.env.API_KEY || process.env.GEMINI_API_KEY);
+        if (!hasEnvKey) {
+            showToast("מפתח API חסר. אנא הגדר מפתח בהגדרות המערכת.", "error");
+            return;
+        }
+    }
     setLoading(true);
     setMode('engineering');
     setLoadingMessage("מנתח את הבקשה ובונה שלד מקצועי...");
@@ -578,7 +653,19 @@ const PromptCowboy: React.FC = () => {
     navigator.clipboard.writeText(text);
     setCopied(true);
     showToast("הפרומפט המלא הועתק!", 'success');
+    
+    // Add a little haptic-like feedback if supported
+    if (window.navigator.vibrate) {
+      window.navigator.vibrate(50);
+    }
+    
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShareApp = () => {
+    const appUrl = window.location.href;
+    navigator.clipboard.writeText(appUrl);
+    showToast("קישור לאפליקציה הועתק! שלח לחברים לבדיקה 🚀", 'success');
   };
 
   const handleSavePrompt = () => {
@@ -696,24 +783,37 @@ const PromptCowboy: React.FC = () => {
             className="w-full bg-transparent text-lg md:text-2xl font-medium text-white outline-none h-32 md:h-40 resize-none placeholder-zinc-600 p-4 md:p-6 leading-relaxed text-right custom-scrollbar"
             dir="rtl"
           />
-          <div className="flex flex-col md:flex-row justify-end items-center gap-3 p-2">
-            <button 
-              onClick={handleStartEngineering} 
-              disabled={!lazyPrompt.trim() || loading} 
-              className="w-full md:w-auto px-6 py-3 bg-white/5 hover:bg-white/10 text-white font-bold text-base rounded-xl border border-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
-            >
-              <span>הנדסה עמוקה</span>
-              <Cpu size={18} className="text-zinc-400 group-hover:text-white transition-colors" />
-            </button>
-            <button 
-              onClick={handleQuickUpgrade} 
-              disabled={!lazyPrompt.trim() || loading} 
-              className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-orange-600 to-orange-500 text-white font-bold text-lg rounded-xl md:rounded-2xl shadow-lg shadow-orange-900/30 hover:shadow-orange-900/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
-            >
-              <span>שדרוג מהיר</span>
-              <Zap size={20} className="group-hover:scale-125 transition-transform" />
-            </button>
-          </div>
+            <div className="flex flex-col md:flex-row justify-end items-center gap-3 p-2">
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                <button 
+                  onClick={() => setShowDeepEngineeringInfo(true)}
+                  className="p-3 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white rounded-xl border border-white/10 transition-all"
+                  title="מה זה הנדסה עמוקה?"
+                >
+                  <HelpCircle size={20} />
+                </button>
+                <button 
+                  onClick={handleStartEngineering} 
+                  disabled={!lazyPrompt.trim() || loading} 
+                  className="flex-1 md:w-auto px-6 py-3 bg-white/5 hover:bg-white/10 text-white font-bold text-base rounded-xl border border-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+                >
+                  <span>הנדסה עמוקה</span>
+                  <Cpu size={18} className="text-zinc-400 group-hover:text-white transition-colors" />
+                </button>
+              </div>
+              <button 
+                onClick={handleQuickUpgrade} 
+                disabled={!lazyPrompt.trim() || loading} 
+                className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-orange-600 to-orange-500 text-white font-bold text-lg rounded-xl md:rounded-2xl shadow-lg shadow-orange-900/30 hover:shadow-orange-900/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group relative overflow-hidden"
+              >
+                <motion.div 
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"
+                  initial={false}
+                />
+                <span>שדרוג מהיר</span>
+                <Zap size={20} className="group-hover:scale-125 transition-transform" />
+              </button>
+            </div>
         </div>
 
         <div className="relative z-10 pt-2 md:pt-4 space-y-3 md:space-y-4">
@@ -738,6 +838,94 @@ const PromptCowboy: React.FC = () => {
   );
 
   const [showGallery, setShowGallery] = useState(false);
+
+  const renderDeepEngineeringModal = () => (
+    <AnimatePresence>
+      {showDeepEngineeringInfo && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            onClick={() => setShowDeepEngineeringInfo(false)}
+          />
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            className="relative bg-[#0a0a0c] border border-white/10 rounded-[2.5rem] p-8 md:p-12 max-w-2xl w-full shadow-2xl overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full -mr-32 -mt-32 blur-[100px]" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full -ml-32 -mb-32 blur-[100px]" />
+
+            <button 
+              onClick={() => setShowDeepEngineeringInfo(false)}
+              className="absolute top-6 left-6 p-2 bg-white/5 hover:bg-white/10 rounded-full text-zinc-400 hover:text-white transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="relative z-10 space-y-8">
+              <div className="flex items-center gap-6">
+                <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-orange-400/20 to-orange-600/20 rounded-2xl flex items-center justify-center text-orange-500 border border-orange-500/30">
+                  <Cpu size={32} />
+                </div>
+                <div>
+                  <h3 className="text-3xl md:text-4xl font-black text-white tracking-tight">מה זה הנדסה עמוקה?</h3>
+                  <p className="text-orange-500 font-bold tracking-widest uppercase text-xs md:text-sm">Deep Prompt Engineering</p>
+                </div>
+              </div>
+
+              <div className="space-y-6 text-zinc-300 leading-relaxed text-base md:text-lg">
+                <p>
+                  הנדסה עמוקה היא תהליך שבו אנחנו לא רק "מבקשים" מה-AI משהו, אלא בונים לו **מערכת הפעלה שלמה** לביצוע המשימה. 
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-5 bg-white/5 rounded-2xl border border-white/5 hover:border-orange-500/30 transition-colors group">
+                    <h4 className="font-bold mb-2 flex items-center gap-2 text-orange-400">
+                      <Target size={18} /> דיוק מקסימלי
+                    </h4>
+                    <p className="text-sm text-zinc-400 leading-relaxed">פירוק המשימה ל-9 רכיבי ליבה (פרסונה, אילוצים, דוגמאות וכו') מבטיח שה-AI יבין בדיוק מה הציפיות שלך.</p>
+                  </div>
+                  <div className="p-5 bg-white/5 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-colors group">
+                    <h4 className="font-bold mb-2 flex items-center gap-2 text-blue-400">
+                      <Zap size={18} /> חשיבה רב-שלבית
+                    </h4>
+                    <p className="text-sm text-zinc-400 leading-relaxed">שילוב של Chain of Thought (שרשרת מחשבה) גורם למודל לתכנן את התשובה לפני שהוא כותב אותה.</p>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-orange-500/10 to-transparent p-6 rounded-2xl border border-orange-500/10">
+                  <h4 className="font-bold mb-3 flex items-center gap-2 text-white">
+                    <Layers size={18} className="text-orange-500" /> למה זה טוב?
+                  </h4>
+                  <ul className="space-y-2 text-sm md:text-base">
+                    <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-orange-500" /> מניעת הזיות (Hallucinations) של המודל</li>
+                    <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-orange-500" /> קבלת תוצאות עקביות ואיכותיות בכל פעם</li>
+                    <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-orange-500" /> חיסכון בזמן של "תיקונים" וניסיונות חוזרים</li>
+                    <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-orange-500" /> יצירת תוכן שנראה כאילו נכתב על ידי מומחה אנושי</li>
+                  </ul>
+                </div>
+
+                <p className="text-xs md:text-sm italic text-zinc-500 text-center">
+                  * במצב הנדסה עמוקה, פנדה AI ישאל אותך שאלות מנחות כדי לדייק את כל הפרמטרים הללו עבורך.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowDeepEngineeringInfo(false)}
+                className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-2xl transition-all shadow-xl shadow-orange-900/40 text-lg"
+              >
+                הבנתי, בואו נתחיל!
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
 
   const renderGalleryModal = () => (
     <AnimatePresence>
@@ -989,8 +1177,19 @@ const PromptCowboy: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setShowDna(!showDna)} 
+                className={`p-2 rounded-lg transition-all ${showDna ? 'bg-orange-500 text-white' : 'bg-white/5 text-zinc-400 hover:text-white'}`}
+                title="ניתוח DNA"
+                aria-label="ניתוח DNA"
+              >
+                <BarChart3 size={18} />
+              </button>
               <button onClick={() => setActiveTab('components')} className="lg:hidden p-2 bg-white/5 rounded-lg text-zinc-400 hover:text-white" aria-label="הצג רכיבים">
                 <PenTool size={18} />
+              </button>
+              <button onClick={handleShareApp} className="p-2 bg-white/5 rounded-lg text-zinc-400 hover:text-blue-400 transition-colors" title="שתף אפליקציה" aria-label="שתף אפליקציה">
+                <Upload size={18} />
               </button>
               <button onClick={undoLast} disabled={history.length === 0} className="p-2 bg-white/5 rounded-lg text-zinc-400 hover:text-white disabled:opacity-30 transition-colors" title="ביטול שינוי אחרון" aria-label="ביטול שינוי אחרון">
                 <History size={18} />
@@ -1006,6 +1205,7 @@ const PromptCowboy: React.FC = () => {
           </div>
 
           <div className="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+            {renderDnaAnalysis()}
             <div className="relative flex-1 flex flex-col min-h-[300px]">
               <textarea
                 readOnly
@@ -1091,6 +1291,7 @@ const PromptCowboy: React.FC = () => {
         </AnimatePresence>
       </div>
 
+      {renderDeepEngineeringModal()}
       {renderGalleryModal()}
 
       {/* Save Modal */}

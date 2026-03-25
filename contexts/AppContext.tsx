@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   AppSettings, ChatSession, Project, APIConfig, ViewMode, 
   UserRole, PandaPersona, ExpertiseLevel, AIModelMode, SavedPrompt
@@ -46,17 +47,73 @@ export const usePrompts = () => { const context = useContext(PromptContext); if 
 // --- Individual Providers ---
 
 const UIProvider: React.FC<{children: ReactNode}> = ({ children }) => {
-  const [view, setView] = useState<ViewMode>(ViewMode.DASHBOARD);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [view, setViewState] = useState<ViewMode>(ViewMode.DASHBOARD);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [legalModal, setLegalModal] = useState<{ isOpen: boolean; type: 'terms' | 'privacy' | 'accessibility' | 'contact' }>({ isOpen: false, type: 'terms' });
   const { toasts, showToast } = useToast();
+
+  // Map paths to ViewMode
+  const pathToView = useMemo(() => ({
+    '/': ViewMode.DASHBOARD,
+    '/dashboard': ViewMode.DASHBOARD,
+    '/chat': ViewMode.CHAT,
+    '/projects': ViewMode.PROJECT_DASHBOARD,
+    '/settings': ViewMode.SETTINGS,
+    '/image-gen': ViewMode.IMAGE_GEN,
+    '/video-gen': ViewMode.VIDEO_GEN,
+    '/prompt': ViewMode.PROMPT_LAB,
+    '/message-gen': ViewMode.MESSAGE_GEN,
+    '/docs': ViewMode.DOC_ANALYSIS,
+    '/templates': ViewMode.TEMPLATES,
+    '/voice': ViewMode.VOICE,
+    '/admin': ViewMode.ADMIN_PANEL,
+    '/api-hub': ViewMode.API_HUB,
+    '/coder': ViewMode.PANDA_CODER,
+    '/academy': ViewMode.ACADEMY,
+  }), []);
+
+  // Map ViewMode to paths
+  const viewToPath = useMemo(() => ({
+    [ViewMode.DASHBOARD]: '/dashboard',
+    [ViewMode.CHAT]: '/chat',
+    [ViewMode.PROJECT_DASHBOARD]: '/projects',
+    [ViewMode.SETTINGS]: '/settings',
+    [ViewMode.IMAGE_GEN]: '/image-gen',
+    [ViewMode.VIDEO_GEN]: '/video-gen',
+    [ViewMode.PROMPT_LAB]: '/prompt',
+    [ViewMode.MESSAGE_GEN]: '/message-gen',
+    [ViewMode.DOC_ANALYSIS]: '/docs',
+    [ViewMode.TEMPLATES]: '/templates',
+    [ViewMode.VOICE]: '/voice',
+    [ViewMode.ADMIN_PANEL]: '/admin',
+    [ViewMode.API_HUB]: '/api-hub',
+    [ViewMode.PANDA_CODER]: '/coder',
+    [ViewMode.ACADEMY]: '/academy',
+  }), []);
+
+  // Sync state with URL on mount and location change
+  useEffect(() => {
+    const currentPath = location.pathname;
+    const matchedView = (pathToView as any)[currentPath];
+    if (matchedView && matchedView !== view) {
+      setViewState(matchedView);
+    }
+  }, [location.pathname, pathToView, view]);
+
+  const setView = useCallback((newView: ViewMode) => {
+    setViewState(newView);
+    const path = (viewToPath as any)[newView] || '/';
+    navigate(path);
+  }, [navigate, viewToPath]);
 
   const value = useMemo(() => ({
     view, setView, isSidebarOpen, setIsSidebarOpen, legalModal, 
     openLegalModal: (type: 'terms' | 'privacy' | 'accessibility' | 'contact') => setLegalModal({ isOpen: true, type }),
     closeLegalModal: () => setLegalModal({ isOpen: false, type: 'terms' }),
     toasts, showToast
-  }), [view, isSidebarOpen, legalModal, toasts, showToast]);
+  }), [view, setView, isSidebarOpen, legalModal, toasts, showToast]);
 
   return <UIContext.Provider value={value}>{children}</UIContext.Provider>;
 };
